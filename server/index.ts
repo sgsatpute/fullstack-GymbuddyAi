@@ -23,8 +23,21 @@ import {
   hasCheckedInToday,
   recordCheckIn,
   updateUserStreak,
+  User,
 } from './db';
 import { calculateScore, getClusterId, findMatches } from './matching';
+
+/**
+ * HELPER: Enrich user object with calculated clusterId
+ * clusterId is deterministic based on user's goal, preferredTime, and experience
+ * It's not stored in DB (to avoid schema changes) but calculated on-the-fly
+ */
+function enrichUserWithClusterId(user: User): any {
+  return {
+    ...user,
+    clusterId: getClusterId(user),
+  };
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -46,7 +59,7 @@ app.post('/api/users/register', (req: any, res: any) => {
     }
 
     const user = registerUser(name, age, email, gym, goal, experience, preferredTime);
-    res.status(201).json(user);
+    res.status(201).json(enrichUserWithClusterId(user));
   } catch (error: any) {
     if (error.message.includes('already registered')) {
       res.status(409).json({ error: error.message });
@@ -59,12 +72,13 @@ app.post('/api/users/register', (req: any, res: any) => {
 
 /**
  * GET /api/users
- * List all registered users
+ * List all registered users with their cluster IDs
  */
 app.get('/api/users', (req: any, res: any) => {
   try {
     const users = getAllUsers();
-    res.json({ count: users.length, users });
+    const enrichedUsers = users.map(enrichUserWithClusterId);
+    res.json({ count: enrichedUsers.length, users: enrichedUsers });
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -169,11 +183,14 @@ app.post('/api/checkin/:userId', (req: any, res: any) => {
     // Persist to database
     updateUserStreak(userId, newStreak, newConsistency);
 
+    // Return enriched user with clusterId
+    const updatedUser = getUserById(userId);
     res.json({
       success: true,
       streak: newStreak,
       consistency: newConsistency,
       message: `Streak: ${newStreak} days! Consistency: ${newConsistency}/100`,
+      user: updatedUser ? enrichUserWithClusterId(updatedUser) : null,
     });
   } catch (error) {
     console.error('Check-in error:', error);
