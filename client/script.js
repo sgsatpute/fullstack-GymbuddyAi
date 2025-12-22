@@ -75,10 +75,9 @@ function loadDashboard() {
 
 async function handleCheckIn() {
     if (!currentUser) return;
-    const res = await fetch('/api/checkin', {
+    const res = await fetch(`/api/checkin/${currentUser.id}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: currentUser.id })
+        headers: { 'Content-Type': 'application/json' }
     });
     const data = await res.json();
     

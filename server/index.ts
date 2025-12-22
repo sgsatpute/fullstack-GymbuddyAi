@@ -78,7 +78,12 @@ function initializeDatabase() {
  * - Same experience level: 10 pts (Prevents injury, enables balanced workouts)
  * - Similar age (≤5yr diff): 5 pts (Social comfort & relatability)
  * 
- * Total max score: 100 (normalized to 0-100 range)
+ * CONSISTENCY BOOST (NEW):
+ * - Consistency score incorporated into match quality
+ * - Higher consistency = more reliable workout partner
+ * - Scales from 0-10 bonus points (consistency/10)
+ * 
+ * Total max score: 110 (40+25+20+10+5+10), normalized to 0-100 range
  * Minimum match threshold: 70 (only high-confidence recommendations)
  * 
  * @param user1 Current user seeking matches
@@ -107,6 +112,14 @@ function calculateScore(user1: any, user2: any) {
   // +5: Similar age creates social comfort
   // Age within 5 years suggests compatible life stage & energy levels
   if (Math.abs(user1.age - user2.age) <= 5) score += 5;
+  
+  // CONSISTENCY BOOST: +0 to +10 based on candidate's workout consistency
+  // Users with high consistency are MORE RELIABLE gym partners
+  // This is how real dating apps work: they boost reliable, active users
+  // Example: consistency=80 → +8 bonus points
+  // This ensures we recommend partners who actually show up to workouts
+  const consistencyBonus = Math.round(user2.consistency / 10);
+  score += consistencyBonus;
   
   // Cap at 100 (even if all features align, score is normalized)
   return Math.min(100, score);
@@ -263,39 +276,113 @@ app.get('/api/matches/:userId', (req: any, res: any) => {
   }
 });
 
-app.post('/api/checkin', (req: any, res: any) => {
+/**
+ * POST /api/checkin/:userId
+ * 
+ * WORKOUT CONSISTENCY TRACKING - Habit Formation & Reliability Scoring
+ * 
+ * This endpoint implements habit-tracking similar to fitness apps (Fitbit, Strava, Apple Health).
+ * It's the core mechanism for measuring workout commitment and reliability.
+ * 
+ * TWO KEY METRICS:
+ * 
+ * 1. STREAK (Consecutive Workouts)
+ *    - Measures commitment/discipline
+ *    - Increments: consecutive days only (diff = 1 day)
+ *    - Resets: if you skip a day (diff > 1 or no check-in)
+ *    - Example: miss Friday → Sunday streak resets to 1
+ *    - This gamification drives engagement (like Duolingo's streaks)
+ * 
+ * 2. CONSISTENCY SCORE (0-100)
+ *    - Measures overall reliability as a gym buddy
+ *    - +5 base per check-in (rewards showing up)
+ *    - +1 bonus per 10-day streak (rewards consistency)
+ *    - Capped at 100 (prevents inflation)
+ *    - Example: 30-day streak → +5 (base) + +3 (streak bonus) = +8 per day
+ *    - HIGH CONSISTENCY USERS get better match recommendations (see calculateScore)
+ * 
+ * STORAGE:
+ *    - checkins table: date-based records (enforces 1 per day)
+ *    - users.streak: running count of consecutive days
+ *    - users.consistency: normalized 0-100 reliability score
+ *    - users.lastCheckIn: ISO timestamp for consecutive day calculation
+ * 
+ * Why this matters for AI recommendations:
+ *    - A 90-consistency user is more valuable than a 30-consistency user
+ *    - Real gym buddies > flaky friends (even if less compatible)
+ *    - Consistency is a strong behavioral signal of commitment
+ */
+app.post('/api/checkin/:userId', (req: any, res: any) => {
   try {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId required' });
+    const userId = parseInt(req.params.userId);
+    if (!userId) return res.status(400).json({ error: 'Invalid userId' });
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    // RULE 1: Only one check-in per day
+    // This enforces the "daily" nature of habit tracking
+    // Multiple check-ins per day don't provide additional value (you either worked out or didn't)
     const today = new Date().toISOString().split('T')[0];
     const existingCheckin = db.prepare('SELECT * FROM checkins WHERE userId = ? AND date = ?').get(userId, today);
 
     if (existingCheckin) {
-      return res.json({ message: 'Already checked in today', success: false, streak: user.streak, consistency: user.consistency });
+      return res.json({ 
+        message: 'Already checked in today', 
+        success: false, 
+        streak: user.streak, 
+        consistency: user.consistency 
+      });
     }
 
+    // Record today's check-in in the checkins table
     db.prepare('INSERT INTO checkins (userId, date) VALUES (?, ?)').run(userId, today);
 
+    // RULE 2: Streak logic (consecutive days vs reset)
+    // Streak is a powerful motivator: it creates a "don't break the chain" dynamic
+    // This is why fitness apps show streaks prominently
     let newStreak = 1;
     if (user.lastCheckIn) {
       const lastDate = new Date(user.lastCheckIn);
       const currDate = new Date(today);
+      // Calculate days between last check-in and today
       const diffDays = Math.ceil((currDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-      if (diffDays === 1) newStreak = user.streak + 1;
-      else newStreak = 1;
+      
+      if (diffDays === 1) {
+        // Consecutive day! Increment streak
+        newStreak = user.streak + 1;
+      } else {
+        // Missed day(s) - reset streak to 1
+        // Even after 100 days, one missed day resets. This maintains discipline.
+        newStreak = 1;
+      }
     }
 
+    // RULE 3: Consistency scoring
+    // Base: +5 points per check-in (consistency never decreases)
+    // Bonus: +1 point per 10-day streak (rewards long-term commitment)
+    // Cap: 100 (prevents score inflation)
+    // Example progression:
+    //   Day 1: 0 + 5 = 5
+    //   Day 10: 45 + 5 + 1 = 51
+    //   Day 20: 51 + 5 + 2 = 58
+    //   Day 100: 95 + 5 + 10 = 100 (capped)
     const baseIncrease = 5;
     const streakBonus = Math.floor(newStreak / 10);
     const newConsistency = Math.min(100, user.consistency + baseIncrease + streakBonus);
 
-    db.prepare('UPDATE users SET streak = ?, consistency = ?, lastCheckIn = ? WHERE id = ?').run(newStreak, newConsistency, new Date().toISOString(), userId);
+    // STORAGE: Persist all changes to SQLite
+    // This ensures streak/consistency survive server restarts and are queryable for matching
+    db.prepare(
+      'UPDATE users SET streak = ?, consistency = ?, lastCheckIn = ? WHERE id = ?'
+    ).run(newStreak, newConsistency, new Date().toISOString(), userId);
 
-    res.json({ success: true, streak: newStreak, consistency: newConsistency, message: `Streak: ${newStreak} days! Consistency: ${newConsistency}/100` });
+    res.json({ 
+      success: true, 
+      streak: newStreak, 
+      consistency: newConsistency, 
+      message: `Streak: ${newStreak} days! Consistency: ${newConsistency}/100` 
+    });
   } catch (error) {
     console.error('Check-in error:', error);
     res.status(500).json({ error: 'Internal server error' });
