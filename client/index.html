@@ -1,15 +1,146 @@
+
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fira+Code:wght@300..700&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Oxanium:wght@200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&family=Roboto:ital,wght@0,100..900;1,100..900&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=Space+Grotesk:wght@300..700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GymBuddy AI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- NAVIGATION -->
+        <nav>
+            <div class="logo">GymBuddy AI</div>
+            <div id="nav-links" class="hidden">
+                <button onclick="showPage('dashboard')">Dashboard</button>
+                <button onclick="showPage('matches')">Find Buddy</button>
+                <button onclick="logout()">Logout</button>
+            </div>
+        </nav>
+
+        <!-- PAGE: HOME -->
+        <div id="home-page" class="page active">
+            <div class="hero">
+                <h1>Find Your Perfect Gym Partner</h1>
+                <p>AI-powered matching based on your goals, schedule, and gym.</p>
+                <button class="btn-primary" onclick="showPage('register')">Get Started</button>
+            </div>
+        </div>
+
+        <!-- PAGE: REGISTER -->
+        <div id="register-page" class="page hidden">
+            <div class="container">
+                <h2>Create Profile</h2>
+                <form id="register-form" onsubmit="handleRegister(event)">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="reg-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Age</label>
+                        <input type="number" id="reg-age" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Gender (Optional)</label>
+                        <select id="reg-gender">
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fitness Goal</label>
+                        <select id="reg-goal" required>
+                            <option value="muscle_gain">Muscle Gain</option>
+                            <option value="fat_loss">Fat Loss</option>
+                            <option value="general_fitness">General Fitness</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Experience Level</label>
+                        <select id="reg-exp" required>
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Preferred Workout Time</label>
+                        <select id="reg-time" required>
+                            <option value="morning">Morning</option>
+                            <option value="evening">Evening</option>
+                            <option value="night">Night</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Gym Name</label>
+                        <input type="text" id="reg-gym" placeholder="e.g. Gold's Gym" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Join Now</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- PAGE: DASHBOARD -->
+        <div id="dashboard-page" class="page hidden">
+            <div class="container">
+                <h2>Welcome, <span id="user-name-display">User</span>!</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Streak</h3>
+                        <div class="stat-value" id="streak-display">0 🔥</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Consistency Score</h3>
+                        <div class="stat-value" id="consistency-display">0/100</div>
+                    </div>
+                </div>
+
+                <div class="action-area">
+                    <button class="btn-checkin" onclick="handleCheckIn()">✅ Check-In Workout Today</button>
+                </div>
+
+                <div class="section">
+                    <h3>Your Cluster</h3>
+                    <p id="cluster-info">AI has assigned you to a fitness cluster.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE: MATCHES -->
+        <div id="matches-page" class="page hidden">
+            <div class="container">
+                <h2>Your Top Matches</h2>
+                <div id="matches-list" class="matches-grid">
+                    <!-- Matches inserted via JS -->
+                    <p>Loading intelligent matches...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE: CHAT -->
+        <div id="chat-page" class="page hidden">
+            <div class="container chat-container">
+                <div class="chat-header">
+                    <button onclick="showPage('matches')">← Back</button>
+                    <h3 id="chat-target-name">Chat</h3>
+                </div>
+                <div id="chat-messages" class="chat-messages">
+                    <!-- Messages go here -->
+                </div>
+                <div class="chat-input">
+                    <input type="text" id="msg-input" placeholder="Type a message...">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+                <div class="chat-actions">
+                    <button class="btn-danger" onclick="blockUser()">Block User</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <script src="script.js"></script>
+</body>
 </html>
