@@ -42,6 +42,16 @@ export class MemStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
+    // Prevent duplicate users with same name and gym (basic validation)
+    const existing = Array.from(this.users.values()).find(
+      u => u.name.toLowerCase() === insertUser.name.toLowerCase() && 
+           u.gymName.toLowerCase() === insertUser.gymName.toLowerCase()
+    );
+    
+    if (existing) {
+      throw new Error("User with this name already exists in this gym");
+    }
+
     const id = this.currentUserId++;
     const user: User = { 
       ...insertUser, 
