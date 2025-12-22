@@ -1,0 +1,196 @@
+You are a senior full-stack engineer, AI engineer, and system architect.
+
+Your task is to BUILD a COMPLETE, FINAL-YEAR-GRADE, PRODUCTION-QUALITY web application named:
+
+========================
+GYMBUDDY AI
+========================
+
+This project MUST be fully implemented inside this Replit workspace and MUST run successfully when I click RUN.
+
+The user is a beginner. Therefore:
+- You must generate ALL files
+- You must write COMPLETE working code
+- You must NOT leave TODOs, comments like "implement later", or pseudo-code
+- You must NOT ask any questions
+- You must NOT simplify or skip features
+
+This is a FINAL submission. Build it as if a college jury and interviewer will evaluate it.
+
+------------------------------------------------
+TECH STACK (STRICT – DO NOT CHANGE)
+------------------------------------------------
+Backend:
+- Node.js
+- Express.js
+
+Frontend:
+- Pure HTML
+- CSS
+- Vanilla JavaScript
+(NO React, NO build tools, NO frameworks)
+
+Database:
+- In-memory data structures (arrays / objects)
+- Must behave like a real database
+- Data must persist during runtime
+
+AI / Intelligence:
+- JavaScript-based intelligent logic
+- Clustering logic
+- Compatibility scoring
+- Recommendation engine
+(NO external ML APIs)
+
+Hosting:
+- Entire app must run inside Replit
+- Start command must be: node index.js
+
+------------------------------------------------
+MANDATORY FEATURES (ALL REQUIRED)
+------------------------------------------------
+
+====================
+1. USER MANAGEMENT
+====================
+- User registration form
+- Fields:
+  - Name
+  - Age
+  - Gender (optional)
+  - Fitness goal (muscle gain / fat loss / general fitness)
+  - Experience level (beginner / intermediate / advanced)
+  - Preferred workout time (morning / evening / night)
+  - Gym name
+- Users stored in backend memory
+- View all registered users (admin-style list)
+
+====================
+2. SMART MATCHING ENGINE (CORE)
+====================
+Implement a REAL compatibility scoring system:
+
+Scoring rules (STRICT):
+- Same workout time → 40%
+- Same gym → 25%
+- Same fitness goal → 20%
+- Same experience level → 10%
+- Age difference ≤ 5 years → 5%
+
+Total score = 100%
+
+Rules:
+- Only show matches with score ≥ 70%
+- Show top 5 matches
+- Score must be shown clearly in UI
+- Matching must be dynamic based on registered users
+
+====================
+3. AI-LIKE INTELLIGENCE (NO FAKE AI)
+====================
+Implement intelligent behavior using logic:
+
+- Cluster users based on:
+  - Fitness goal
+  - Workout time
+  - Experience level
+- Assign each user a cluster ID
+- Prefer matches from same cluster
+- Automatically recommend:
+  - Best gym buddy today
+  - Most consistent buddy
+- Explain logic via code comments
+
+====================
+4. CONSISTENCY & ACCOUNTABILITY SYSTEM
+====================
+- Workout check-in button
+- Daily attendance tracking
+- Consistency score (0–100)
+- Workout streak calculation
+- Display streak count on dashboard
+- Consistency score must influence recommendations
+
+====================
+5. CHAT SYSTEM
+====================
+- One-to-one chat between matched users only
+- Messages stored in backend memory
+- Each message must have:
+  - Sender
+  - Timestamp
+  - Content
+- Chat UI with send/receive functionality
+
+====================
+6. SAFETY FEATURES
+====================
+- Block user
+- Report user
+- Blocked users must not appear in matches or chat
+- Reported users flagged internally
+
+====================
+7. FRONTEND UI (COMPLETE)
+====================
+Create FULL UI with navigation:
+
+Pages required:
+- Home page
+- User registration page
+- Dashboard
+- Match results page
+- Chat page
+
+Requirements:
+- Clean layout
+- Buttons must WORK
+- Forms must submit correctly
+- Fetch data using fetch() API
+- Proper success/error messages
+
+====================
+8. SYSTEM ARCHITECTURE
+====================
+- Proper folder structure:
+  /backend
+  /backend/routes
+  /backend/controllers
+  /frontend
+  /frontend/pages
+  /frontend/styles
+- index.js must act as main server
+- Express must serve frontend pages
+- REST APIs must be used
+
+====================
+9. CODE QUALITY (NON-NEGOTIABLE)
+====================
+- Clear variable names
+- Comments explaining important logic
+- No unused code
+- No runtime errors
+- App must run immediately on Replit
+
+------------------------------------------------
+FINAL OUTPUT EXPECTATION
+------------------------------------------------
+When I click RUN:
+- Server starts successfully
+- Web app opens
+- I can register users
+- I can view dashboard
+- I can find gym buddies
+- I can see match scores
+- I can chat
+- I can check-in workouts
+- I can see streaks & consistency
+- App behaves like a real product
+
+This is a FINAL-YEAR PROJECT.
+Do not compromise.
+Do not simplify.
+Build EVERYTHING.
+
+DO NOT ASK QUESTIONS.
+JUST BUILD THE COMPLETE PROJECT.
