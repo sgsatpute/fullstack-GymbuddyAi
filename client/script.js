@@ -28,7 +28,7 @@ function logout() {
     showPage('home');
 }
 
-// Registration
+// Registration - SQLite backend
 async function handleRegister(e) {
     e.preventDefault();
     
@@ -36,24 +36,29 @@ async function handleRegister(e) {
         name: document.getElementById('reg-name').value,
         age: parseInt(document.getElementById('reg-age').value),
         gender: document.getElementById('reg-gender').value,
+        email: document.getElementById('reg-name').value + '@gymbuddy.local',
         goal: document.getElementById('reg-goal').value,
         experience: document.getElementById('reg-exp').value,
-        workoutTime: document.getElementById('reg-time').value,
-        gymName: document.getElementById('reg-gym').value
+        preferredTime: document.getElementById('reg-time').value,
+        gym: document.getElementById('reg-gym').value
     };
 
     try {
-        const res = await fetch('/api/register', {
+        const res = await fetch('/api/users/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
         
-        if (!res.ok) throw new Error("Registration failed");
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || "Registration failed");
+        }
         
         const user = await res.json();
         currentUser = user;
         showPage('dashboard');
+        alert('Welcome to GymBuddy! Your data is now persistent.');
     } catch (err) {
         alert(err.message);
     }
@@ -64,8 +69,8 @@ function loadDashboard() {
     if (!currentUser) return;
     document.getElementById('user-name-display').innerText = currentUser.name;
     document.getElementById('streak-display').innerText = `${currentUser.streak || 0} 🔥`;
-    document.getElementById('consistency-display').innerText = `${currentUser.consistencyScore || 0}/100`;
-    document.getElementById('cluster-info').innerText = `You are in Cluster #${currentUser.clusterId}. We use this to find people with similar habits!`;
+    document.getElementById('consistency-display').innerText = `${currentUser.consistency || 0}/100`;
+    document.getElementById('cluster-info').innerText = `You are in Cluster #${currentUser.clusterId || 0}. Data persisted in SQLite!`;
 }
 
 async function handleCheckIn() {
@@ -77,13 +82,14 @@ async function handleCheckIn() {
     });
     const data = await res.json();
     
-    // Update local state
-    currentUser.streak = data.streak;
-    currentUser.consistencyScore = data.consistencyScore;
-    loadDashboard();
-    
-    if (data.message) alert(data.message);
-    else alert("Workout Checked In! Great job!");
+    if (data.success) {
+        currentUser.streak = data.streak;
+        currentUser.consistency = data.consistency;
+        loadDashboard();
+        alert(data.message);
+    } else {
+        alert(data.message || 'Already checked in today');
+    }
 }
 
 // Matches
@@ -111,7 +117,7 @@ async function loadMatches() {
             div.innerHTML = `
                 <div class="match-info">
                     <h4>${m.user.name} (${m.user.age})</h4>
-                    <p>${m.user.gymName} • ${m.user.workoutTime}</p>
+                    <p>${m.user.gym} • ${m.user.preferredTime}</p>
                     <div class="match-tags">
                         <span class="match-score">${m.score}% Match</span>
                         ${tagsHtml}
