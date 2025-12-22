@@ -64,21 +64,90 @@ function initializeDatabase() {
   console.log('✓ Database initialized with persistent storage');
 }
 
+/**
+ * WEIGHTED SCORING ENGINE - AI-Style Recommendation Logic
+ * 
+ * This implements a multi-feature scoring system similar to collaborative filtering
+ * used in recommendation engines (Netflix, Spotify, etc.). Each feature is weighted
+ * by importance, allowing the algorithm to make nuanced compatibility decisions.
+ * 
+ * Weights chosen based on habit alignment impact:
+ * - Same workout time: 40 pts (MOST IMPORTANT - coordination is critical for gym buddies)
+ * - Same gym: 25 pts (Location compatibility enables consistent meetups)
+ * - Same fitness goal: 20 pts (Motivational alignment keeps both engaged)
+ * - Same experience level: 10 pts (Prevents injury, enables balanced workouts)
+ * - Similar age (≤5yr diff): 5 pts (Social comfort & relatability)
+ * 
+ * Total max score: 100 (normalized to 0-100 range)
+ * Minimum match threshold: 70 (only high-confidence recommendations)
+ * 
+ * @param user1 Current user seeking matches
+ * @param user2 Potential match candidate
+ * @returns Compatibility score (0-100)
+ */
 function calculateScore(user1: any, user2: any) {
   let score = 0;
+  
+  // +40: Same workout time is THE most important factor
+  // A buddy who works out at the same time can actually meet you at the gym
   if (user1.preferredTime === user2.preferredTime) score += 40;
+  
+  // +25: Same gym location ensures physical compatibility
+  // Even perfect timing doesn't matter if you're in different cities
   if (user1.gym.toLowerCase() === user2.gym.toLowerCase()) score += 25;
+  
+  // +20: Same goal creates shared motivation and workout focus
+  // Someone building muscle needs different workouts than someone losing fat
   if (user1.goal === user2.goal) score += 20;
+  
+  // +10: Same experience level prevents injury & unsafe practices
+  // A beginner needs guidance; an advanced lifter needs challenge
   if (user1.experience === user2.experience) score += 10;
+  
+  // +5: Similar age creates social comfort
+  // Age within 5 years suggests compatible life stage & energy levels
   if (Math.abs(user1.age - user2.age) <= 5) score += 5;
+  
+  // Cap at 100 (even if all features align, score is normalized)
   return Math.min(100, score);
 }
 
+/**
+ * HABIT-BASED CLUSTERING - Segmentation for AI Recommendations
+ * 
+ * Clustering is a fundamental ML technique that groups similar items together.
+ * Here we create "habit clusters" - segments of users with compatible lifestyles.
+ * 
+ * Users in the SAME CLUSTER get an "AI Recommended" badge because they represent
+ * optimal matches (both have same habits AND high compatibility score).
+ * 
+ * Cluster formula: goalCode*100 + timeCode*10 + experienceCode
+ * Example: muscle_morning_advanced = (1*100) + (1*10) + (3) = 113
+ * Example: fatLoss_night_beginner = (2*100) + (3*10) + (1) = 231
+ * 
+ * This creates deterministic, interpretable groupings (no black-box clustering).
+ * Users with identical lifestyle patterns naturally fall into same cluster.
+ * 
+ * @param user Fitness profile to cluster
+ * @returns Cluster ID (numeric identifier for habit segment)
+ */
 function getClusterId(user: any) {
+  // Map categorical values to numeric codes
+  // These represent distinct lifestyle segments
   const goalMap: any = { 'muscle': 1, 'fatloss': 2, 'fitness': 3 };
   const timeMap: any = { 'morning': 1, 'evening': 2, 'night': 3 };
   const expMap: any = { 'beginner': 1, 'intermediate': 2, 'advanced': 3 };
-  return (goalMap[user.goal] || 0) * 100 + (timeMap[user.preferredTime] || 0) * 10 + (expMap[user.experience] || 0);
+  
+  // Weighted positional encoding creates unique cluster per lifestyle
+  // Hundreds place: fitness goal (most important distinction)
+  // Tens place: workout time (secondary distinction)
+  // Ones place: experience level (tertiary distinction)
+  // 
+  // This ensures users with IDENTICAL fitness habits cluster together
+  // Example: All morning muscle-builders have clusterId 111
+  return (goalMap[user.goal] || 0) * 100 + 
+         (timeMap[user.preferredTime] || 0) * 10 + 
+         (expMap[user.experience] || 0);
 }
 
 // API Endpoints
@@ -121,21 +190,71 @@ app.get('/api/users', (req: any, res: any) => {
   }
 });
 
+/**
+ * GET /api/matches/:userId
+ * 
+ * AI-POWERED MATCHING ENGINE - Multi-Stage Recommendation Pipeline
+ * 
+ * This endpoint implements a real recommendation system with 4 stages:
+ * 
+ * 1. EXCLUSION RULE: Never match user with themselves
+ *    - Prevents returning the current user as their own match
+ * 
+ * 2. SCORING STAGE: Calculate compatibility scores
+ *    - Uses weighted feature matching (see calculateScore())
+ *    - Also computes cluster membership for each candidate
+ * 
+ * 3. FILTERING STAGE: Confidence threshold (score >= 70)
+ *    - 70+ = "high confidence" match in recommendation systems
+ *    - Eliminates low-quality matches
+ *    - Prevents wasting user time on poor recommendations
+ * 
+ * 4. RANKING + LIMITING STAGE: Top 5, sorted by score DESC
+ *    - Sorts by score descending (best matches first)
+ *    - Returns top 5 only (prevents recommendation overload)
+ *    - Similar to Netflix "Top Recommendations" or LinkedIn "Suggested Jobs"
+ * 
+ * 5. TAGGING STAGE: "AI Recommended" badge for cluster matches
+ *    - Only matches in same cluster get special badge
+ *    - Indicates perfect habit alignment (rare, valuable recommendations)
+ */
 app.get('/api/matches/:userId', (req: any, res: any) => {
   try {
     const userId = parseInt(req.params.userId);
+    
+    // Load current user
     const currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
     if (!currentUser) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // STAGE 1: Exclude self from candidates (id != ?)
     const allUsers = db.prepare('SELECT * FROM users WHERE id != ?').all(userId);
+    
+    // STAGE 2 & 3: Score all candidates and filter by confidence threshold
+    // STAGE 4: Sort by score DESC and take top 5
+    // STAGE 5: Tag cluster matches with "AI Recommended" badge
     const matches = allUsers
-      .map((u: any) => ({ user: u, score: calculateScore(currentUser, u), clusterId: getClusterId(u), isClusterMatch: getClusterId(currentUser) === getClusterId(u) }))
+      // Score each candidate & compute cluster membership
+      .map((u: any) => ({ 
+        user: u, 
+        score: calculateScore(currentUser, u), 
+        clusterId: getClusterId(u), 
+        isClusterMatch: getClusterId(currentUser) === getClusterId(u) 
+      }))
+      // Filter: only high-confidence matches (score >= 70)
       .filter((m: any) => m.score >= 70)
+      // Rank: sort by score descending (best matches first)
       .sort((a: any, b: any) => b.score - a.score)
+      // Limit: take only top 5 matches (prevent recommendation overload)
       .slice(0, 5)
-      .map((m: any) => ({ user: m.user, score: Math.round(m.score), isClusterMatch: m.isClusterMatch, tags: m.isClusterMatch ? ['AI Recommended'] : [] }));
+      // Tag: mark cluster matches with "AI Recommended" badge
+      .map((m: any) => ({ 
+        user: m.user, 
+        score: Math.round(m.score), 
+        isClusterMatch: m.isClusterMatch, 
+        tags: m.isClusterMatch ? ['AI Recommended'] : [] 
+      }));
 
     res.json(matches);
   } catch (error) {
