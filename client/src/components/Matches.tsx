@@ -1,87 +1,110 @@
-// client/src/components/Matches.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../utils/api";
-import { socket } from "../utils/socket";
-
-type Match = {
-  user: { id: number; name: string };
-  score: number;
-  reasons?: string[];
-  canChat: boolean;
-};
+import { formatExperience, formatGoal, formatTimePreference } from "../utils/display";
+import { MatchItem } from "../utils/models";
 
 export default function Matches() {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [online, setOnline] = useState<number[]>([]);
+  const [matches, setMatches] = useState<MatchItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
-    let cancelled = false;
-
     apiFetch("/api/matches")
-      .then(async (res) => {
-        if (!res.ok) {
-          // If server says profile is incomplete -> redirect to completion
-          const d = await res.json().catch(() => ({}));
-          if (d && d.error && d.error === "PROFILE_INCOMPLETE") {
+      .then(async (response) => {
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          if (data?.error === "PROFILE_INCOMPLETE") {
             navigate("/complete-profile");
-            return;
+            return null;
           }
           throw new Error("Failed to load matches");
         }
-        return res.json();
+
+        return response.json();
       })
-      .then((data: Match[]) => {
-        if (!cancelled) setMatches(data);
+      .then((data: MatchItem[] | null) => {
+        if (data) {
+          setMatches(data);
+        }
       })
-      .catch(() => {});
-
-    // socket online (optional)
-    socket.connect();
-    const token = localStorage.getItem("token");
-    let myId = null;
-    if (token) {
-      try {
-        myId = JSON.parse(atob(token.split(".")[1])).id;
-        socket.emit("online", myId);
-      } catch {}
-    }
-
-    socket.on("online-users", (users: number[]) => setOnline(users || []));
-
-    return () => {
-      cancelled = true;
-      socket.off("online-users");
-      socket.disconnect();
-    };
+      .catch(() => setError("Could not load your matches right now."))
+      .finally(() => setLoading(false));
   }, [navigate]);
 
+  if (loading) {
+    return <div className="page-section">Finding your best gym matches...</div>;
+  }
+
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Matches</h2>
-      {matches.length === 0 && <p>No matches found.</p>}
-
-      {matches.map((m) => (
-        <div key={m.user.id} style={{ marginBottom: 14 }}>
-          <strong>{m.user.name}</strong> — {m.score}%
-          {online.includes(m.user.id) && <span style={{ color: "green", marginLeft: 6 }}>● Online</span>}
-
-          {m.canChat ? (
-            <div>
-              <button style={{ marginTop: 6 }} onClick={() => navigate(`/chat/${m.user.id}`)}>Start Chat</button>
-            </div>
-          ) : (
-            <p style={{ color: "gray" }}>Chat locked (score &lt; 60%)</p>
-          )}
-
-          {m.reasons && (
-            <ul>
-              {m.reasons.map((r, idx) => <li key={idx}>{r}</li>)}
-            </ul>
-          )}
+    <div className="page-stack">
+      <section className="hero-panel">
+        <div>
+          <span className="eyebrow">Matches</span>
+          <h1>People who fit your training rhythm.</h1>
+          <p>
+            Each match is scored from a mix of goals, training schedule, consistency, and shared location signals.
+          </p>
         </div>
-      ))}
+        <button className="btn btn-secondary" onClick={() => navigate("/complete-profile")}>
+          Update Profile
+        </button>
+      </section>
+
+      {error && <div className="feedback error">{error}</div>}
+
+      {matches.length === 0 ? (
+        <section className="card empty-state">
+          <h2>No strong matches yet</h2>
+          <p>Try refining your profile or come back after more people complete their training details.</p>
+        </section>
+      ) : (
+        <section className="grid-list">
+          {matches.map((match) => (
+            <article key={match.user.id} className="card match-card">
+              <div className="section-head">
+                <div>
+                  <span className="eyebrow">{match.tier}</span>
+                  <h2>{match.user.name}</h2>
+                </div>
+                <div className="score-pill">{match.score}%</div>
+              </div>
+
+              <p className="muted">
+                {formatGoal(match.user.goal)} · {formatExperience(match.user.experience)} · {formatTimePreference(match.user.preferredTime)}
+              </p>
+
+              <div className="chip-row">
+                {match.user.gym && <span className="chip">{match.user.gym}</span>}
+                <span className="chip">Level {match.user.level}</span>
+                <span className="chip">{match.user.streak} day streak</span>
+              </div>
+
+              <p>{match.user.bio?.trim() || "This athlete is ready to stay more consistent with the right training partner."}</p>
+
+              <ul className="reason-list">
+                {match.reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+
+              <div className="action-row">
+                <button className="btn btn-primary" onClick={() => navigate(`/profile/${match.user.id}`)}>
+                  View Profile
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => navigate(`/chat/${match.user.id}`)}
+                  disabled={!match.canChat}
+                >
+                  {match.canChat ? "Start Chat" : "Unlock at 60%"}
+                </button>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
     </div>
   );
 }

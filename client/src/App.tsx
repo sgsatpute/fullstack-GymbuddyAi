@@ -1,152 +1,102 @@
-import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
-
-import Home from "./components/Home";
-import Login from "./components/Login";
-import Register from "./components/Register";
-import Dashboard from "./components/Dashboard";
-import Matches from "./components/Matches";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import AppShell from "./components/AppShell";
 import Chat from "./components/Chat";
 import CompleteProfile from "./components/CompleteProfile";
-import Leaderboard from "./components/Leaderboard"; // ✅ NEW
-
-function isAuth() {
-  return !!localStorage.getItem("token");
-}
-
-function logout() {
-  localStorage.removeItem("token");
-  window.location.href = "/login";
-}
+import Dashboard from "./components/Dashboard";
+import ForgotPassword from "./components/ForgotPassword";
+import Home from "./components/Home";
+import Inbox from "./components/Inbox";
+import Leaderboard from "./components/Leaderboard";
+import Login from "./components/Login";
+import Matches from "./components/Matches";
+import Profile from "./components/Profile";
+import Register from "./components/Register";
+import { getCurrentUserId, hasStoredToken } from "./utils/auth";
 
 function Protected({ children }: { children: JSX.Element }) {
-  return isAuth() ? children : <Navigate to="/login" replace />;
+  return hasStoredToken() ? children : <Navigate to="/login" replace />;
+}
+
+function ProtectedShell({ children }: { children: JSX.Element }) {
+  return (
+    <Protected>
+      <AppShell>{children}</AppShell>
+    </Protected>
+  );
+}
+
+function MyProfileRedirect() {
+  const userId = getCurrentUserId();
+  return userId ? <Navigate to={`/profile/${userId}`} replace /> : <Navigate to="/dashboard" replace />;
 }
 
 export default function App() {
-  const loggedIn = isAuth();
+  const loggedIn = hasStoredToken();
 
   return (
     <BrowserRouter>
-      {/* NAVBAR */}
-      <nav
-        style={{
-          padding: 16,
-          background: "#2f3542",
-          display: "flex",
-          gap: 16,
-          alignItems: "center",
-        }}
-      >
-        <Link to="/" style={{ color: "#a29bfe" }}>
-          Home
-        </Link>
-
-        {!loggedIn && (
-          <>
-            <Link to="/register" style={{ color: "#a29bfe" }}>
-              Register
-            </Link>
-            <Link to="/login" style={{ color: "#a29bfe" }}>
-              Login
-            </Link>
-          </>
-        )}
-
-        {loggedIn && (
-          <>
-            <Link to="/dashboard" style={{ color: "#a29bfe" }}>
-              Dashboard
-            </Link>
-            <Link to="/matches" style={{ color: "#a29bfe" }}>
-              Matches
-            </Link>
-            <Link to="/leaderboard" style={{ color: "#a29bfe" }}>
-              Leaderboard
-            </Link>
-            <Link to="/chat" style={{ color: "#a29bfe" }}>
-              Chat
-            </Link>
-            <button
-              onClick={logout}
-              style={{
-                color: "#a29bfe",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Logout
-            </button>
-          </>
-        )}
-      </nav>
-
-      {/* ROUTES */}
       <Routes>
         <Route path="/" element={<Home />} />
-
-        <Route
-          path="/login"
-          element={loggedIn ? <Navigate to="/dashboard" /> : <Login />}
-        />
-
-        <Route
-          path="/register"
-          element={loggedIn ? <Navigate to="/dashboard" /> : <Register />}
-        />
+        <Route path="/login" element={loggedIn ? <Navigate to="/dashboard" replace /> : <Login />} />
+        <Route path="/register" element={loggedIn ? <Navigate to="/dashboard" replace /> : <Register />} />
+        <Route path="/forgot-password" element={loggedIn ? <Navigate to="/dashboard" replace /> : <ForgotPassword />} />
 
         <Route
           path="/dashboard"
           element={
-            <Protected>
+            <ProtectedShell>
               <Dashboard />
-            </Protected>
+            </ProtectedShell>
           }
         />
-
-        {/* PROFILE COMPLETION */}
         <Route
           path="/complete-profile"
           element={
-            <Protected>
+            <ProtectedShell>
               <CompleteProfile />
-            </Protected>
+            </ProtectedShell>
           }
         />
-
         <Route
           path="/matches"
           element={
-            <Protected>
+            <ProtectedShell>
               <Matches />
-            </Protected>
+            </ProtectedShell>
           }
         />
-
         <Route
           path="/leaderboard"
           element={
-            <Protected>
+            <ProtectedShell>
               <Leaderboard />
-            </Protected>
+            </ProtectedShell>
           }
         />
-
         <Route
-          path="/chat"
+          path="/inbox"
           element={
-            <Protected>
-              <Chat />
-            </Protected>
+            <ProtectedShell>
+              <Inbox />
+            </ProtectedShell>
           }
         />
-
+        <Route path="/chat" element={<Navigate to="/inbox" replace />} />
         <Route
           path="/chat/:id"
           element={
-            <Protected>
+            <ProtectedShell>
               <Chat />
-            </Protected>
+            </ProtectedShell>
+          }
+        />
+        <Route path="/profile" element={<MyProfileRedirect />} />
+        <Route
+          path="/profile/:id"
+          element={
+            <ProtectedShell>
+              <Profile />
+            </ProtectedShell>
           }
         />
       </Routes>

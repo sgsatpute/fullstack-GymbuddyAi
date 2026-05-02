@@ -1,50 +1,76 @@
-function isTokenExpired(token: string) {
-  try {
-    // Decode JWT payload
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    const now = Math.floor(Date.now() / 1000);
+import {
+  clearStoredToken,
+  getStoredToken,
+  isTokenExpired,
+  refreshSession,
+} from "./auth";
 
-    return payload.exp < now;
-  } catch {
-    // If token is malformed, treat as expired
-    return true;
-  }
+function redirectToLogin() {
+  window.location.href = "/login";
 }
 
-export async function apiFetch(
-  url: string,
-  options: RequestInit = {}
-) {
-  const token = localStorage.getItem("token");
+async function getValidToken() {
+  const token = getStoredToken();
 
-  // 🔐 NO TOKEN → LOGOUT
   if (!token) {
-    window.location.href = "/login";
-    throw new Error("No token");
+    return refreshSession();
   }
 
-  // 🔐 EXPIRED TOKEN → AUTO LOGOUT
   if (isTokenExpired(token)) {
-    localStorage.removeItem("token");
-    window.location.href = "/login";
-    throw new Error("Token expired");
+    return refreshSession();
   }
 
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  });
+  return token;
+}
 
-  // 🔐 BACKEND REJECTED TOKEN
-  if (res.status === 401) {
-    localStorage.removeItem("token");
-    window.location.href = "/login";
+function buildHeaders(options: RequestInit, token: string) {
+  const headers = new Headers(options.headers ?? {});
+
+  headers.set("Authorization", `Bearer ${token}`);
+
+  if (options.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  return headers;
+}
+
+async function doFetch(url: string, options: RequestInit, token: string) {
+  return fetch(url, {
+    ...options,
+    headers: buildHeaders(options, token),
+    credentials: "same-origin",
+  });
+}
+
+export async function apiFetch(url: string, options: RequestInit = {}) {
+  let token = await getValidToken();
+
+  if (!token) {
+    clearStoredToken();
+    redirectToLogin();
+    throw new Error("No active session");
+  }
+
+  let response = await doFetch(url, options, token);
+
+  if (response.status === 401) {
+    token = await refreshSession();
+
+    if (!token) {
+      clearStoredToken();
+      redirectToLogin();
+      throw new Error("Unauthorized");
+    }
+
+    response = await doFetch(url, options, token);
+  }
+
+  if (response.status === 401) {
+    clearStoredToken();
+    redirectToLogin();
     throw new Error("Unauthorized");
   }
 
-  return res;
+  return response;
 }

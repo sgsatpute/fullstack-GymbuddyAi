@@ -1,38 +1,37 @@
-import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { KeyboardEvent, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { apiFetch } from "../utils/api";
+import { getCurrentUserId } from "../utils/auth";
+import { formatDateTime, formatExperience, formatGoal, formatTimePreference } from "../utils/display";
+import { ChatMessage, UserProfile } from "../utils/models";
 import { socket } from "../utils/socket";
 
-type Message = {
-  senderId: number;
-  receiverId: number;
-  message: string;
-  createdAt: string;
-  seen?: number;
-};
-
-type TypingPayload = {
-  from: number;
+type ChatPayload = {
+  participant: UserProfile;
+  messages: ChatMessage[];
 };
 
 export default function Chat() {
   const { id } = useParams();
   const navigate = useNavigate();
   const otherId = Number(id);
-
-  const myId = JSON.parse(
-    atob(localStorage.getItem("token")!.split(".")[1])
-  ).id;
-
-  const [messages, setMessages] = useState<Message[]>([]);
+  const myId = getCurrentUserId();
+  const [participant, setParticipant] = useState<UserProfile | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
   const [typing, setTyping] = useState(false);
-
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!otherId) {
-      navigate("/matches");
+      navigate("/inbox");
+      return;
+    }
+
+    if (!myId) {
+      navigate("/login");
       return;
     }
 
@@ -40,18 +39,25 @@ export default function Chat() {
     socket.emit("online", myId);
 
     apiFetch(`/api/chat/${otherId}`)
-      .then(res => res.json())
-      .then((data: Message[]) => {
-        setMessages(data);
+      .then((response) => response.json())
+      .then((data: ChatPayload) => {
+        setParticipant(data.participant);
+        setMessages(data.messages);
         socket.emit("seen", { from: otherId, to: myId });
-      });
+      })
+      .catch(() => setError("Could not load this conversation."))
+      .finally(() => setLoading(false));
 
-    socket.on("receive-message", (msg: Message) => {
-      setMessages(prev => [...prev, msg]);
-      socket.emit("seen", { from: msg.senderId, to: myId });
+    socket.on("receive-message", (message: ChatMessage) => {
+      if (message.senderId !== otherId || message.receiverId !== myId) {
+        return;
+      }
+
+      setMessages((current) => [...current, message]);
+      socket.emit("seen", { from: message.senderId, to: myId });
     });
 
-    socket.on("typing", ({ from }: TypingPayload) => {
+    socket.on("typing", ({ from }: { from: number }) => {
       if (from === otherId) {
         setTyping(true);
         setTimeout(() => setTyping(false), 1200);
@@ -60,9 +66,9 @@ export default function Chat() {
 
     socket.on("seen", ({ by }: { by: number }) => {
       if (by === otherId) {
-        setMessages(prev =>
-          prev.map(m =>
-            m.senderId === myId ? { ...m, seen: 1 } : m
+        setMessages((current) =>
+          current.map((message) =>
+            message.senderId === myId ? { ...message, seen: 1 } : message
           )
         );
       }
@@ -74,141 +80,112 @@ export default function Chat() {
       socket.off("seen");
       socket.disconnect();
     };
-  }, [otherId, myId, navigate]);
+  }, [myId, navigate, otherId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
 
   async function send() {
-    if (!text.trim()) return;
+    if (!text.trim() || !myId) {
+      return;
+    }
 
     await apiFetch(`/api/chat/${otherId}`, {
       method: "POST",
       body: JSON.stringify({ message: text }),
     });
 
-    const msg: Message = {
+    const nextMessage: ChatMessage = {
       senderId: myId,
       receiverId: otherId,
-      message: text,
+      message: text.trim(),
       createdAt: new Date().toISOString(),
       seen: 0,
     };
 
-    socket.emit("send-message", msg);
-    setMessages(prev => [...prev, msg]);
+    socket.emit("send-message", nextMessage);
+    setMessages((current) => [...current, nextMessage]);
     setText("");
   }
 
   function handleTyping() {
+    if (!myId) {
+      return;
+    }
+
     socket.emit("typing", { from: myId, to: otherId });
   }
 
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      send();
+    }
+  }
+
+  if (loading) {
+    return <div className="page-section">Loading conversation...</div>;
+  }
+
+  if (error || !participant) {
+    return <div className="feedback error">{error || "Conversation not found."}</div>;
+  }
+
   return (
-    <div
-      style={{
-        maxWidth: 700,
-        margin: "0 auto",
-        padding: 20,
-        height: "85vh",
-        display: "flex",
-        flexDirection: "column",
-        border: "1px solid #ddd",
-        borderRadius: 12,
-        background: "#f8f9fa",
-      }}
-    >
-      <h3 style={{ marginBottom: 10 }}>Chat</h3>
-
-      {/* CHAT MESSAGES */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "10px 6px",
-          marginBottom: 10,
-        }}
-      >
-        {messages.map((m, i) => {
-          const isMe = m.senderId === myId;
-
-          return (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                justifyContent: isMe ? "flex-end" : "flex-start",
-                marginBottom: 8,
-              }}
-            >
-              <div
-                style={{
-                  maxWidth: "70%",
-                  padding: "8px 12px",
-                  borderRadius: 12,
-                  background: isMe ? "#a29bfe" : "#e9ecef",
-                  color: "#000",
-                  fontSize: 14,
-                }}
-              >
-                <div>{m.message}</div>
-
-                {isMe && (
-                  <div
-                    style={{
-                      fontSize: 10,
-                      textAlign: "right",
-                      marginTop: 2,
-                      opacity: 0.7,
-                    }}
-                  >
-                    {m.seen ? "✓✓ Seen" : "✓ Sent"}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
-        {typing && (
-          <div style={{ fontSize: 12, color: "#555" }}>
-            Typing…
+    <div className="chat-page">
+      <div className="card chat-shell">
+        <div className="chat-header">
+          <div>
+            <span className="eyebrow">Conversation</span>
+            <h2>{participant.name}</h2>
+            <p className="muted">
+              {formatGoal(participant.goal)} · {formatExperience(participant.experience)} · {formatTimePreference(participant.preferredTime)}
+            </p>
           </div>
-        )}
+          <div className="action-row">
+            <button className="btn btn-secondary" onClick={() => navigate(`/profile/${participant.id}`)}>
+              View Profile
+            </button>
+            <button className="btn btn-secondary" onClick={() => navigate("/inbox")}>
+              Back to Inbox
+            </button>
+          </div>
+        </div>
 
-        <div ref={bottomRef} />
-      </div>
+        <div className="chat-stream">
+          {messages.map((message, index) => {
+            const isMe = message.senderId === myId;
 
-      {/* INPUT BAR */}
-      <div style={{ display: "flex", gap: 8 }}>
-        <input
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            handleTyping();
-          }}
-          placeholder="Type a message..."
-          style={{
-            flex: 1,
-            padding: "10px",
-            borderRadius: 8,
-            border: "1px solid #ccc",
-          }}
-        />
-        <button
-          onClick={send}
-          style={{
-            padding: "10px 16px",
-            borderRadius: 8,
-            background: "#6c5ce7",
-            color: "#fff",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          Send
-        </button>
+            return (
+              <div key={`${message.createdAt}-${index}`} className={`chat-bubble-row ${isMe ? "me" : "them"}`}>
+                <div className={`chat-bubble ${isMe ? "me" : "them"}`}>
+                  <div>{message.message}</div>
+                  <span className="chat-meta">
+                    {formatDateTime(message.createdAt)} · {isMe ? (message.seen ? "Seen" : "Sent") : participant.name}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+
+          {typing && <div className="muted">Typing...</div>}
+          <div ref={bottomRef} />
+        </div>
+
+        <div className="chat-composer">
+          <input
+            value={text}
+            onChange={(event) => {
+              setText(event.target.value);
+              handleTyping();
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Send a message that gets the routine started..."
+          />
+          <button className="btn btn-primary" onClick={send}>
+            Send
+          </button>
+        </div>
       </div>
     </div>
   );

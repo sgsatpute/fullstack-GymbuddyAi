@@ -1,129 +1,100 @@
 import { useNavigate } from "react-router-dom";
+import { hasStoredToken } from "../utils/auth";
+
+const features = [
+  {
+    title: "Meaningful matching",
+    copy: "We score compatibility using goals, training schedule, experience, location, and consistency patterns.",
+  },
+  {
+    title: "Daily accountability",
+    copy: "Check in, build streaks, collect XP, and stay motivated with feedback that actually reflects your progress.",
+  },
+  {
+    title: "Real conversation flow",
+    copy: "Inbox, unread counts, live chat, and profile trust signals make it easier to turn a match into a routine.",
+  },
+];
 
 export default function Home() {
   const navigate = useNavigate();
+  const loggedIn = hasStoredToken();
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background:
-          "linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%)",
-        color: "#fff",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 900,
-          padding: "60px 40px",
-          display: "grid",
-          gridTemplateColumns: "1.2fr 1fr",
-          gap: 40,
-          alignItems: "center",
-        }}
-      >
-        {/* LEFT: TEXT */}
+    <div className="landing-page">
+      <section className="landing-hero">
+        <div className="landing-copy">
+          <span className="eyebrow">Deploy-ready fitness social product</span>
+          <h1>Find the gym partner who keeps your habit alive.</h1>
+          <p>
+            GymBuddy AI helps people train more consistently by pairing them with compatible partners,
+            tracking momentum, and making it easier to stay accountable together.
+          </p>
+
+          <div className="hero-actions">
+            <button className="btn btn-primary" onClick={() => navigate(loggedIn ? "/dashboard" : "/register")}>
+              {loggedIn ? "Open Dashboard" : "Create Account"}
+            </button>
+            <button className="btn btn-secondary" onClick={() => navigate(loggedIn ? "/matches" : "/login")}>
+              {loggedIn ? "Browse Matches" : "Login"}
+            </button>
+          </div>
+
+          <div className="chip-row">
+            <span className="chip">AI-based compatibility</span>
+            <span className="chip">Daily streak system</span>
+            <span className="chip">Live messaging</span>
+          </div>
+        </div>
+
+        <div className="hero-showcase">
+          <div className="showcase-card accent-panel">
+            <span className="eyebrow">Today’s value</span>
+            <strong>Turn intent into routine.</strong>
+            <p>Better partner fit, better follow-through, better odds of actually showing up.</p>
+          </div>
+          <div className="showcase-grid">
+            <div className="showcase-card">
+              <strong>Compatibility first</strong>
+              <p>No random swiping. Every match explains why it fits.</p>
+            </div>
+            <div className="showcase-card">
+              <strong>Progress loop</strong>
+              <p>XP, streaks, achievements, and leaderboard energy keep users engaged.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="feature-grid">
+        {features.map((feature) => (
+          <article key={feature.title} className="card feature-card">
+            <h2>{feature.title}</h2>
+            <p>{feature.copy}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="card roadmap-card">
         <div>
-          <h1 style={{ fontSize: 42, marginBottom: 12 }}>
-            GymBuddy <span style={{ opacity: 0.9 }}>AI</span>
-          </h1>
-
-          <p style={{ fontSize: 18, lineHeight: 1.6, opacity: 0.95 }}>
-            An AI-powered platform that matches you with the
-            <b> perfect gym partner </b>
-            based on goals, timing, experience, and consistency.
-          </p>
-
-          <ul style={{ marginTop: 20, lineHeight: 1.8 }}>
-            <li>🤖 Smart AI matching</li>
-            <li>💬 Real-time chat</li>
-            <li>🔥 Streak & consistency tracking</li>
-            <li>🟢 Online status & typing indicators</li>
-          </ul>
-
-          <div style={{ marginTop: 30 }}>
-            <button
-              onClick={() => navigate("/register")}
-              style={{
-                padding: "12px 24px",
-                fontSize: 16,
-                borderRadius: 12,
-                border: "none",
-                background: "#fff",
-                color: "#6c5ce7",
-                fontWeight: 600,
-                cursor: "pointer",
-                marginRight: 12,
-              }}
-            >
-              Get Started
-            </button>
-
-            <button
-              onClick={() => navigate("/login")}
-              style={{
-                padding: "12px 24px",
-                fontSize: 16,
-                borderRadius: 12,
-                border: "1px solid #fff",
-                background: "transparent",
-                color: "#fff",
-                cursor: "pointer",
-              }}
-            >
-              Login
-            </button>
-          </div>
-
-          <p
-            style={{
-              marginTop: 24,
-              fontSize: 13,
-              opacity: 0.85,
-            }}
-          >
-            Built for consistency. Powered by AI.
-          </p>
+          <span className="eyebrow">How it works</span>
+          <h2>From sign-up to consistency loop</h2>
         </div>
-
-        {/* RIGHT: VISUAL CARD */}
-        <div
-          style={{
-            background: "rgba(255,255,255,0.15)",
-            borderRadius: 20,
-            padding: 30,
-            backdropFilter: "blur(8px)",
-          }}
-        >
-          <h3 style={{ marginBottom: 10 }}>How it works</h3>
-
-          <ol style={{ lineHeight: 1.8 }}>
-            <li>Create your fitness profile</li>
-            <li>AI analyzes compatibility</li>
-            <li>Get high-quality matches</li>
-            <li>Chat & build consistency together</li>
-          </ol>
-
-          <div
-            style={{
-              marginTop: 20,
-              padding: 16,
-              borderRadius: 14,
-              background: "rgba(0,0,0,0.15)",
-              fontSize: 14,
-            }}
-          >
-            ⚡ No random swiping  
-            <br />
-            🎯 Goal-driven matching  
-            <br />
-            📈 Designed for long-term fitness
+        <div className="step-grid">
+          <div>
+            <strong>1. Set your training profile</strong>
+            <p>Tell the app your goal, gym, preferred time, experience, and training style.</p>
+          </div>
+          <div>
+            <strong>2. Review quality matches</strong>
+            <p>See compatibility explanations, view public profiles, and start conversations with confidence.</p>
+          </div>
+          <div>
+            <strong>3. Stay accountable together</strong>
+            <p>Check in daily, build streaks, and keep the relationship active through real chat and progress signals.</p>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

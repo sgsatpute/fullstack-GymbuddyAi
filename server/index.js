@@ -1,49 +1,57 @@
 import express from "express";
 import http from "http";
-import { Server } from "socket.io";
+import cookieParser from "cookie-parser";
+import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
-
+import { Server } from "socket.io";
+import config from "./config.js";
+import { apiLimiter } from "./middleware/rateLimit.js";
 import authRoutes from "./routes/auth.js";
+import checkinRoutes from "./routes/checkin.js";
 import userRoutes from "./routes/users.js";
 import matchRoutes from "./routes/matches.js";
 import chatRoutes from "./routes/chat.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import coachRoutes from "./routes/coach.js";
+import leaderboardRoutes from "./routes/leaderboard.js";
 
 const app = express();
 const server = http.createServer(app);
+const productionClientDir = path.resolve(process.cwd(), "dist", "public");
 
 const io = new Server(server, {
-  cors: { origin: "*" }
+  cors: { origin: "*" },
 });
 
-const PORT = 5001;
-
+app.use(cookieParser());
 app.use(express.json());
+app.use("/api", apiLimiter);
 
 app.use("/api/auth", authRoutes);
+app.use("/api/checkin", checkinRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/matches", matchRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/coach", coachRoutes);
+app.use("/api/leaderboard", leaderboardRoutes);
 
 app.get("/api/health", (_, res) => res.json({ status: "OK" }));
 
-/* ======================
-   SOCKET STATE
-   ====================== */
+if (config.isProduction && fs.existsSync(productionClientDir)) {
+  app.use(express.static(productionClientDir));
+
+  app.get(/^(?!\/api|\/socket\.io).*/, (_req, res) => {
+    res.sendFile(path.join(productionClientDir, "index.html"));
+  });
+}
+
 const onlineUsers = new Map();
 
 io.on("connection", (socket) => {
-
-  // USER ONLINE
   socket.on("online", (userId) => {
     onlineUsers.set(userId, socket.id);
     io.emit("online-users", [...onlineUsers.keys()]);
   });
 
-  // TYPING INDICATOR
   socket.on("typing", ({ from, to }) => {
     const target = onlineUsers.get(to);
     if (target) {
@@ -51,15 +59,13 @@ io.on("connection", (socket) => {
     }
   });
 
-  // SEND MESSAGE (REAL TIME)
-  socket.on("send-message", (msg) => {
-    const target = onlineUsers.get(msg.receiverId);
+  socket.on("send-message", (message) => {
+    const target = onlineUsers.get(message.receiverId);
     if (target) {
-      io.to(target).emit("receive-message", msg);
+      io.to(target).emit("receive-message", message);
     }
   });
 
-  // ✅ READ RECEIPT (SEEN)
   socket.on("seen", ({ from, to }) => {
     const target = onlineUsers.get(from);
     if (target) {
@@ -67,11 +73,10 @@ io.on("connection", (socket) => {
     }
   });
 
-  // USER DISCONNECT
   socket.on("disconnect", () => {
-    for (const [uid, sid] of onlineUsers.entries()) {
-      if (sid === socket.id) {
-        onlineUsers.delete(uid);
+    for (const [userId, socketId] of onlineUsers.entries()) {
+      if (socketId === socket.id) {
+        onlineUsers.delete(userId);
         break;
       }
     }
@@ -79,6 +84,6 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`🏋️ Server + Socket running on http://localhost:${PORT}`);
+server.listen(config.port, () => {
+  console.log(`Server + Socket running on http://localhost:${config.port}`);
 });

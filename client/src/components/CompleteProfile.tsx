@@ -1,158 +1,168 @@
-// client/src/components/CompleteProfile.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../utils/api";
+import { UserProfile } from "../utils/models";
 
 export default function CompleteProfile() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
-  const [name, setName] = useState("");
   const [age, setAge] = useState<number | "">("");
   const [gym, setGym] = useState("");
   const [goal, setGoal] = useState("muscle");
   const [experience, setExperience] = useState("beginner");
   const [preferredTime, setPreferredTime] = useState("morning");
+  const [bio, setBio] = useState("");
 
   useEffect(() => {
-    // load current user profile (if any)
     apiFetch("/api/users/me")
-      .then(r => r.json())
-      .then((u) => {
-        setName(u.name || "");
-        if (u.age) setAge(u.age);
-        if (u.gym) setGym(u.gym);
-        if (u.goal) setGoal(u.goal);
-        if (u.experience) setExperience(u.experience);
-        if (u.preferredTime) setPreferredTime(u.preferredTime);
+      .then((response) => response.json())
+      .then((user: UserProfile) => {
+        setProfile(user);
+        if (user.age) setAge(user.age);
+        if (user.gym) setGym(user.gym);
+        if (user.goal) setGoal(user.goal);
+        if (user.experience) setExperience(user.experience);
+        if (user.preferredTime) setPreferredTime(user.preferredTime);
+        if (user.bio) setBio(user.bio);
       })
-      .catch(() => {})
+      .catch(() => setError("Could not load your profile."))
       .finally(() => setLoading(false));
   }, []);
 
   async function saveProfile() {
     setError("");
+
     if (!age || !gym || !goal || !experience || !preferredTime) {
-      setError("Please fill all required fields.");
+      setError("Please complete the required fields.");
       return;
     }
 
     setSaving(true);
 
     try {
-      const res = await apiFetch("/api/users/profile", {
+      const response = await apiFetch("/api/users/profile", {
         method: "POST",
-        body: JSON.stringify({ age, gym, goal, experience, preferredTime }),
+        body: JSON.stringify({ age, gym, goal, experience, preferredTime, bio }),
       });
 
-      if (!res.ok) {
-        const d = await res.json();
-        setError(d.error || "Failed to save profile");
-        setSaving(false);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setError(data.error || "Failed to save profile");
         return;
       }
 
-      // success -> go to dashboard
       navigate("/dashboard");
-    } catch (err) {
+    } catch {
       setError("Network error while saving profile");
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading) return <div style={{ padding: 40 }}>Loading...</div>;
+  if (loading) {
+    return <div className="page-section">Loading your profile form...</div>;
+  }
 
   return (
-    <div style={{ maxWidth: 520, margin: "48px auto", padding: 20 }}>
-      <h2>Complete Your Profile</h2>
-      <p style={{ color: "#666" }}>
-        Tell us about your gym and goals so we can find the best buddies.
-      </p>
+    <div className="page-stack">
+      <section className="hero-panel">
+        <div>
+          <span className="eyebrow">Complete your profile</span>
+          <h1>Help the matching system work harder for you.</h1>
+          <p>
+            The better your profile, the better the compatibility signals, trust, and conversation quality.
+          </p>
+        </div>
+      </section>
 
-      <div style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 13 }}>Full Name</label>
-        <input value={name} readOnly style={{ ...inputStyle, background: "#f8f8f8" }} />
-      </div>
-
-      <div style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 13 }}>Age</label>
-        <input
-          type="number"
-          value={age}
-          onChange={e => setAge(Number(e.target.value))}
-          style={inputStyle}
-        />
-      </div>
-
-      <div style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 13 }}>Gym / Location</label>
-        <input value={gym} onChange={e => setGym(e.target.value)} style={inputStyle} />
-      </div>
-
-      <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 13 }}>Goal</label>
-          <select value={goal} onChange={e => setGoal(e.target.value)} style={inputStyle}>
-            <option value="muscle">Muscle gain</option>
-            <option value="fatloss">Fat loss</option>
-            <option value="fitness">General fitness</option>
-          </select>
+      <section className="card form-card">
+        <div className="detail-list">
+          <div>
+            <span>Name</span>
+            <strong>{profile?.name}</strong>
+          </div>
+          <div>
+            <span>Email</span>
+            <strong>{profile?.email}</strong>
+          </div>
         </div>
 
-        <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 13 }}>Experience</label>
-          <select value={experience} onChange={e => setExperience(e.target.value)} style={inputStyle}>
-            <option value="beginner">Beginner</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
-          </select>
+        <div className="form-grid two-up">
+          <label className="field">
+            <span>Age</span>
+            <input
+              type="number"
+              min={13}
+              value={age}
+              onChange={(event) => {
+                const value = event.target.value;
+                setAge(value === "" ? "" : Number(value));
+              }}
+            />
+          </label>
+
+          <label className="field">
+            <span>Gym / area</span>
+            <input
+              placeholder="FitZone Downtown"
+              value={gym}
+              onChange={(event) => setGym(event.target.value)}
+            />
+          </label>
+
+          <label className="field">
+            <span>Goal</span>
+            <select value={goal} onChange={(event) => setGoal(event.target.value)}>
+              <option value="muscle">Muscle gain</option>
+              <option value="fatloss">Fat loss</option>
+              <option value="fitness">General fitness</option>
+            </select>
+          </label>
+
+          <label className="field">
+            <span>Experience</span>
+            <select value={experience} onChange={(event) => setExperience(event.target.value)}>
+              <option value="beginner">Beginner</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advanced">Advanced</option>
+            </select>
+          </label>
+
+          <label className="field">
+            <span>Preferred workout time</span>
+            <select value={preferredTime} onChange={(event) => setPreferredTime(event.target.value)}>
+              <option value="morning">Morning</option>
+              <option value="evening">Evening</option>
+              <option value="night">Night</option>
+            </select>
+          </label>
+
+          <label className="field field-full">
+            <span>Bio</span>
+            <textarea
+              rows={4}
+              placeholder="What kind of training partner helps you show up at your best?"
+              value={bio}
+              onChange={(event) => setBio(event.target.value)}
+            />
+          </label>
         </div>
-      </div>
 
-      <div style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 13 }}>Preferred Workout Time</label>
-        <select value={preferredTime} onChange={e => setPreferredTime(e.target.value)} style={inputStyle}>
-          <option value="morning">Morning</option>
-          <option value="evening">Evening</option>
-          <option value="night">Night</option>
-        </select>
-      </div>
+        {error && <div className="feedback error">{error}</div>}
 
-      {error && <div style={{ color: "red", marginTop: 12 }}>{error}</div>}
-
-      <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-        <button onClick={saveProfile} disabled={saving} style={primaryBtn}>
-          {saving ? "Saving..." : "Save & Continue"}
-        </button>
-
-        <button
-          onClick={() => navigate("/dashboard")}
-          style={{ padding: "10px 14px", borderRadius: 8 }}
-        >
-          Skip
-        </button>
-      </div>
+        <div className="action-row">
+          <button className="btn btn-primary" onClick={saveProfile} disabled={saving}>
+            {saving ? "Saving..." : "Save Profile"}
+          </button>
+          <button className="btn btn-secondary" onClick={() => navigate("/dashboard")}>
+            Back to Dashboard
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  marginTop: 6,
-  borderRadius: 8,
-  border: "1px solid #ccc",
-};
-
-const primaryBtn: React.CSSProperties = {
-  flex: 1,
-  padding: "10px 14px",
-  borderRadius: 8,
-  border: "none",
-  background: "#6c5ce7",
-  color: "#fff",
-  cursor: "pointer",
-};

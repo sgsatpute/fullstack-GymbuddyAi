@@ -1,124 +1,124 @@
-// client/src/components/Register.tsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { setStoredToken } from "../utils/auth";
 
 export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   async function submit() {
     setError("");
 
-    // Register
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      setError(data.error || "Registration failed");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
       return;
     }
 
-    // Auto-login so user gets a token and can complete profile immediately
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const loginRes = await fetch("/api/auth/login", {
+      const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        credentials: "same-origin",
+        body: JSON.stringify({ name, email, password }),
       });
-      const loginData = await loginRes.json();
 
-      if (!loginRes.ok) {
-        // fallback: send to login page if auto-login fails
-        navigate("/login");
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Registration failed");
         return;
       }
 
-      localStorage.setItem("token", loginData.token);
-      // Go to profile completion page
+      setStoredToken(data.token);
       navigate("/complete-profile");
-    } catch (err) {
-      // If anything goes wrong, send user to login
-      navigate("/login");
+    } catch {
+      setError("Unable to reach the server");
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 420,
-        margin: "80px auto",
-        padding: 24,
-        borderRadius: 14,
-        border: "1px solid #ddd",
-        background: "#fff",
-      }}
-    >
-      <h2 style={{ marginBottom: 4 }}>Create Profile 🏋️</h2>
-      <p style={{ color: "#666", marginBottom: 20 }}>Join GymBuddy AI</p>
+    <div className="auth-page">
+      <div className="auth-card">
+        <span className="eyebrow">Create account</span>
+        <h1>Start building your fitness support system.</h1>
+        <p className="muted">
+          Sign up, complete your training profile, and get better-quality match recommendations.
+        </p>
 
-      <input
-        placeholder="Full Name"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        style={inputStyle}
-      />
+        <div className="form-grid">
+          <label className="field">
+            <span>Full name</span>
+            <input
+              placeholder="Your name"
+              autoComplete="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
 
-      <input
-        placeholder="Email"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        style={inputStyle}
-      />
+          <label className="field">
+            <span>Email</span>
+            <input
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={e => setPassword(e.target.value)}
-        style={inputStyle}
-      />
+          <label className="field">
+            <span>Password</span>
+            <input
+              type="password"
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
 
-      <button onClick={submit} style={primaryBtn}>
-        Create Account
-      </button>
+          <label className="field">
+            <span>Confirm password</span>
+            <input
+              type="password"
+              autoComplete="new-password"
+              placeholder="Repeat your password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+            />
+          </label>
+        </div>
 
-      {error && <p style={{ color: "red", marginTop: 12 }}>{error}</p>}
+        {error && <div className="feedback error">{error}</div>}
 
-      <p style={{ marginTop: 16, fontSize: 14 }}>
-        Already registered?{" "}
-        <span
-          style={{ color: "#6c5ce7", cursor: "pointer" }}
-          onClick={() => navigate("/login")}
-        >
-          Login
-        </span>
-      </p>
+        <div className="action-row">
+          <button className="btn btn-primary" onClick={submit} disabled={loading}>
+            {loading ? "Creating Account..." : "Create Account"}
+          </button>
+        </div>
+
+        <p className="auth-switch">
+          Already registered?{" "}
+          <button type="button" className="text-link" onClick={() => navigate("/login")}>
+            Login
+          </button>
+        </p>
+      </div>
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  marginBottom: 12,
-  borderRadius: 10,
-  border: "1px solid #ccc",
-};
-
-const primaryBtn: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 14px",
-  borderRadius: 10,
-  border: "none",
-  background: "#6c5ce7",
-  color: "#fff",
-  cursor: "pointer",
-};

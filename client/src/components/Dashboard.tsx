@@ -1,120 +1,219 @@
-// client/src/components/Dashboard.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../utils/api";
-
-type User = {
-  id: number;
-  name: string;
-  streak: number;
-  consistency: number;
-  xp: number;
-  level: number;
-  profileComplete?: boolean;
-};
+import { formatExperience, formatGoal, formatTimePreference } from "../utils/display";
+import { Achievement, UserProfile } from "../utils/models";
 
 export default function Dashboard() {
-  const [user, setUser] = useState<User | null>(null);
-  const [coachTip, setCoachTip] = useState<string>("");
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [coachTip, setCoachTip] = useState("");
+  const [checkInMessage, setCheckInMessage] = useState("");
+  const [checkInPending, setCheckInPending] = useState(false);
   const navigate = useNavigate();
 
+  async function loadUser() {
+    const response = await apiFetch("/api/users/me");
+    const data = await response.json();
+    setUser(data);
+  }
+
   useEffect(() => {
-    apiFetch("/api/users/me")
-      .then(res => res.json())
-      .then(setUser)
-      .catch(() => {});
+    loadUser().catch(() => {});
   }, []);
 
   useEffect(() => {
     apiFetch("/api/coach/today")
-      .then(res => res.json())
-      .then(d => setCoachTip(d.message))
+      .then((response) => response.json())
+      .then((data) => setCoachTip(data.message))
       .catch(() => {});
   }, []);
 
-  if (!user) return <p style={{ padding: 40 }}>Loading dashboard...</p>;
+  const highlightedAchievements = useMemo(
+    () => (user?.achievements ?? []).slice(0, 4),
+    [user]
+  );
+
+  async function handleDailyCheckIn() {
+    if (!user || user.checkedInToday || checkInPending) {
+      return;
+    }
+
+    setCheckInPending(true);
+    setCheckInMessage("");
+
+    try {
+      const response = await apiFetch("/api/checkin", {
+        method: "POST",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setCheckInMessage(data.error || "Could not complete your check-in.");
+        return;
+      }
+
+      await loadUser();
+      setCheckInMessage(data.message || "Daily check-in complete.");
+    } catch {
+      setCheckInMessage("Could not complete your check-in.");
+    } finally {
+      setCheckInPending(false);
+    }
+  }
+
+  if (!user) {
+    return <div className="page-section">Loading your dashboard...</div>;
+  }
 
   if (!user.profileComplete) {
     return (
-      <div style={{ maxWidth: 500, margin: "80px auto", padding: 24 }}>
-        <h2>Welcome, {user.name} 👋</h2>
-        <p style={{ color: "#666", marginBottom: 20 }}>
-          Complete your profile to unlock AI matching.
-        </p>
-        <button onClick={() => navigate("/complete-profile")} style={primaryBtn}>
-          Complete Profile
-        </button>
+      <div className="page-stack">
+        <section className="hero-panel">
+          <div>
+            <span className="eyebrow">Finish setup</span>
+            <h1>Complete your training profile, {user.name}.</h1>
+            <p>
+              The app can already protect your account, but it needs your training details before it can deliver useful matching.
+            </p>
+          </div>
+          <button className="btn btn-primary" onClick={() => navigate("/complete-profile")}>
+            Complete Profile
+          </button>
+        </section>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto", padding: 24 }}>
-      <h2>Welcome, {user.name} 👋</h2>
-
-      {/* LEVEL BADGE */}
-      <div
-        style={{
-          display: "inline-block",
-          padding: "6px 12px",
-          borderRadius: 999,
-          background: "#ffeaa7",
-          fontWeight: 600,
-          marginBottom: 12,
-        }}
-      >
-        🏆 Level {user.level} · {user.xp} XP
-      </div>
-
-      <p style={{ color: "#666", marginBottom: 20 }}>
-        Stay consistent. Your gym buddy is waiting 💪
-      </p>
-
-      <div style={card}>
-        <strong>🤖 AI Coach</strong>
-        <p>{coachTip || "Analyzing activity..."}</p>
-      </div>
-
-      <div style={card}>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <div>
-            <div style={label}>🔥 Streak</div>
-            <div style={value}>{user.streak} days</div>
-          </div>
-          <div>
-            <div style={label}>📈 Consistency</div>
-            <div style={value}>{user.consistency}%</div>
+    <div className="page-stack">
+      <section className="hero-panel">
+        <div>
+          <span className="eyebrow">Dashboard</span>
+          <h1>Welcome back, {user.name}.</h1>
+          <p>
+            {formatGoal(user.goal)} · {formatExperience(user.experience)} · {formatTimePreference(user.preferredTime)}
+            {user.gym ? ` · ${user.gym}` : ""}
+          </p>
+          <div className="chip-row">
+            <span className="chip">Level {user.level}</span>
+            <span className="chip">{user.xp} XP total</span>
+            <span className="chip">{user.streak} day streak</span>
           </div>
         </div>
 
-        <div style={progressBg}>
-          <div style={{ ...progressFill, width: `${user.consistency}%` }} />
+        <div className="hero-actions">
+          <button className="btn btn-primary" onClick={() => navigate("/matches")}>
+            Find Matches
+          </button>
+          <button className="btn btn-secondary" onClick={() => navigate("/inbox")}>
+            Open Inbox
+          </button>
         </div>
-      </div>
+      </section>
 
-      <div style={{ display: "flex", gap: 12 }}>
-        <button onClick={() => navigate("/matches")} style={{ ...primaryBtn, flex: 1 }}>
-          Find Gym Buddies
-        </button>
-        <button
-          onClick={() => {
-            localStorage.removeItem("token");
-            navigate("/login");
-          }}
-          style={secondaryBtn}
-        >
-          Logout
-        </button>
-      </div>
+      <section className="stats-grid">
+        <div className="card stat-card">
+          <span className="eyebrow">Level progress</span>
+          <strong>
+            {user.levelProgress?.xpIntoLevel ?? 0} / 100 XP
+          </strong>
+          <div className="progress">
+            <div
+              className="progress-fill"
+              style={{ width: `${user.levelProgress?.levelProgressPercent ?? 0}%` }}
+            />
+          </div>
+          <p>{user.levelProgress?.xpNeededForNextLevel ?? 0} XP to next level</p>
+        </div>
+        <div className="card stat-card">
+          <span className="eyebrow">Conversations</span>
+          <strong>{user.stats?.conversationCount ?? 0}</strong>
+          <p>{user.stats?.unreadMessages ?? 0} unread right now</p>
+        </div>
+        <div className="card stat-card">
+          <span className="eyebrow">Daily streak</span>
+          <strong>{user.streak} days</strong>
+          <p>{user.stats?.totalCheckins ?? 0} total check-ins</p>
+        </div>
+        <div className="card stat-card">
+          <span className="eyebrow">Consistency</span>
+          <strong>{user.consistency}%</strong>
+          <p>{user.stats?.messagesSent ?? 0} messages sent</p>
+        </div>
+      </section>
+
+      <section className="two-column">
+        <div className="card">
+          <div className="section-head">
+            <div>
+              <span className="eyebrow">Daily action</span>
+              <h2>Check in and reinforce the habit.</h2>
+            </div>
+            <button
+              className="btn btn-primary"
+              onClick={handleDailyCheckIn}
+              disabled={Boolean(user.checkedInToday) || checkInPending}
+            >
+              {user.checkedInToday
+                ? "Checked In Today"
+                : checkInPending
+                  ? "Checking In..."
+                  : "Daily Check-In"}
+            </button>
+          </div>
+
+          <p className="muted">
+            Daily check-ins keep your streak alive, unlock more achievements, and build visible momentum for future matches.
+          </p>
+
+          {checkInMessage && (
+            <div className={`feedback ${checkInMessage.toLowerCase().includes("could not") ? "error" : "success"}`}>
+              {checkInMessage}
+            </div>
+          )}
+
+          <div className="progress compact">
+            <div className="progress-fill" style={{ width: `${user.consistency}%` }} />
+          </div>
+          <p className="muted">Consistency score updates after every successful check-in.</p>
+        </div>
+
+        <div className="card">
+          <span className="eyebrow">Coach tip</span>
+          <h2>Today’s recommendation</h2>
+          <p>{coachTip || "Analyzing your recent momentum..."}</p>
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="section-head">
+          <div>
+            <span className="eyebrow">Achievements</span>
+            <h2>Visible progress signals</h2>
+          </div>
+          <button className="btn btn-secondary" onClick={() => navigate(`/profile/${user.id}`)}>
+            View Full Profile
+          </button>
+        </div>
+
+        <div className="achievement-grid">
+          {highlightedAchievements.map((achievement: Achievement) => (
+            <article
+              key={achievement.key}
+              className={`achievement-card ${achievement.unlocked ? "achievement-unlocked" : ""}`}
+            >
+              <strong>{achievement.title}</strong>
+              <p>{achievement.description}</p>
+              <div className="progress compact">
+                <div className="progress-fill" style={{ width: `${achievement.progressPercent}%` }} />
+              </div>
+              <span className="muted">
+                {achievement.progress}/{achievement.target}
+              </span>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
-
-/* styles unchanged */
-const card = { border: "1px solid #ddd", borderRadius: 14, padding: 20, background: "#fff", marginBottom: 20 };
-const label = { fontSize: 13, color: "#777" };
-const value = { fontSize: 24, fontWeight: 600 };
-const progressBg = { height: 10, background: "#eee", borderRadius: 8, overflow: "hidden" };
-const progressFill = { height: "100%", background: "#6c5ce7" };
-const primaryBtn = { padding: "10px 14px", borderRadius: 10, border: "none", background: "#6c5ce7", color: "#fff" };
-const secondaryBtn = { padding: "10px 14px", borderRadius: 10, border: "1px solid #ddd", background: "#fff" };

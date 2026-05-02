@@ -1,98 +1,93 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { setStoredToken } from "../utils/auth";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   async function handleLogin() {
     setError("");
+    setLoading(true);
 
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ email, password }),
+      });
 
-    const data = await res.json();
+      const data = await response.json();
 
-    if (!res.ok) {
-      setError(data.error || "Login failed");
-      return;
+      if (!response.ok) {
+        setError(data.error || "Login failed");
+        return;
+      }
+
+      setStoredToken(data.token);
+      navigate("/dashboard");
+    } catch {
+      setError("Unable to reach the server");
+    } finally {
+      setLoading(false);
     }
-
-    localStorage.setItem("token", data.token);
-    navigate("/dashboard");
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 420,
-        margin: "80px auto",
-        padding: 24,
-        borderRadius: 14,
-        border: "1px solid #ddd",
-        background: "#fff",
-      }}
-    >
-      <h2 style={{ marginBottom: 4 }}>Welcome Back 👋</h2>
-      <p style={{ color: "#666", marginBottom: 20 }}>
-        Login to find your gym buddy
-      </p>
+    <div className="auth-page">
+      <div className="auth-card">
+        <span className="eyebrow">Welcome back</span>
+        <h1>Pick up your training momentum.</h1>
+        <p className="muted">
+          Login to see your streak, unread messages, AI coach tip, and latest matches.
+        </p>
 
-      <input
-        placeholder="Email"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        style={inputStyle}
-      />
+        <div className="form-grid">
+          <label className="field">
+            <span>Email</span>
+            <input
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
 
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={e => setPassword(e.target.value)}
-        style={inputStyle}
-      />
+          <label className="field">
+            <span>Password</span>
+            <input
+              type="password"
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+        </div>
 
-      <button onClick={handleLogin} style={primaryBtn}>
-        Login
-      </button>
+        {error && <div className="feedback error">{error}</div>}
 
-      {error && (
-        <p style={{ color: "red", marginTop: 12 }}>{error}</p>
-      )}
+        <div className="action-row">
+          <button className="btn btn-primary" onClick={handleLogin} disabled={loading}>
+            {loading ? "Logging In..." : "Login"}
+          </button>
+          <button className="btn btn-secondary" onClick={() => navigate("/forgot-password")}>
+            Forgot Password
+          </button>
+        </div>
 
-      <p style={{ marginTop: 16, fontSize: 14 }}>
-        New here?{" "}
-        <span
-          style={{ color: "#6c5ce7", cursor: "pointer" }}
-          onClick={() => navigate("/register")}
-        >
-          Create account
-        </span>
-      </p>
+        <p className="auth-switch">
+          New here?{" "}
+          <button type="button" className="text-link" onClick={() => navigate("/register")}>
+            Create an account
+          </button>
+        </p>
+      </div>
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  marginBottom: 12,
-  borderRadius: 10,
-  border: "1px solid #ccc",
-};
-
-const primaryBtn: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 14px",
-  borderRadius: 10,
-  border: "none",
-  background: "#6c5ce7",
-  color: "#fff",
-  cursor: "pointer",
-};
