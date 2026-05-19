@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import Chat from "./components/Chat";
+import Coach from "./components/Coach";
 import CompleteProfile from "./components/CompleteProfile";
 import Dashboard from "./components/Dashboard";
 import ForgotPassword from "./components/ForgotPassword";
@@ -9,6 +10,7 @@ import Inbox from "./components/Inbox";
 import Leaderboard from "./components/Leaderboard";
 import Login from "./components/Login";
 import Matches from "./components/Matches";
+import Nutrition from "./components/Nutrition";
 import Profile from "./components/Profile";
 import Register from "./components/Register";
 import { getCurrentUserId, hasStoredToken } from "./utils/auth";
@@ -74,6 +76,22 @@ export default function App() {
           }
         />
         <Route
+          path="/coach"
+          element={
+            <ProtectedShell>
+              <Coach />
+            </ProtectedShell>
+          }
+        />
+        <Route
+          path="/nutrition"
+          element={
+            <ProtectedShell>
+              <Nutrition />
+            </ProtectedShell>
+          }
+        />
+        <Route
           path="/inbox"
           element={
             <ProtectedShell>
@@ -90,6 +108,7 @@ export default function App() {
             </ProtectedShell>
           }
         />
+        <Route path="/profile/me" element={<MyProfileRedirect />} />
         <Route path="/profile" element={<MyProfileRedirect />} />
         <Route
           path="/profile/:id"

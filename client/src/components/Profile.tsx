@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import Avatar from "./Avatar";
 import { apiFetch } from "../utils/api";
 import { getCurrentUserId } from "../utils/auth";
 import { formatExperience, formatGoal, formatShortDate, formatTimePreference } from "../utils/display";
@@ -12,6 +13,8 @@ export default function Profile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [aiIntro, setAiIntro] = useState("");
+  const [aiIntroLoading, setAiIntroLoading] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -27,6 +30,33 @@ export default function Profile() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  async function handleGenerateIntro() {
+    if (!profile) {
+      return;
+    }
+
+    setAiIntroLoading(true);
+    setError("");
+
+    try {
+      const response = await apiFetch(`/api/matches/${profile.id}/intro`, {
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError(data.error || "Could not generate an intro right now.");
+        return;
+      }
+
+      setAiIntro(data.message || "");
+    } catch {
+      setError("Could not generate an intro right now.");
+    } finally {
+      setAiIntroLoading(false);
+    }
+  }
+
   if (loading) {
     return <div className="page-section">Loading profile...</div>;
   }
@@ -37,23 +67,34 @@ export default function Profile() {
 
   const isSelf = profile.relationship?.isSelf ?? currentUserId === profile.id;
   const achievements = profile.achievements ?? [];
+  const locationMapUrl =
+    profile.locationLat !== null &&
+    profile.locationLat !== undefined &&
+    profile.locationLng !== null &&
+    profile.locationLng !== undefined
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${profile.locationLat},${profile.locationLng}`)}`
+      : null;
 
   return (
     <div className="page-stack">
       <section className="hero-panel">
-        <div>
-          <span className="eyebrow">{isSelf ? "My profile" : "Public profile"}</span>
-          <h1>{profile.name}</h1>
-          <p>
-            {profile.bio?.trim()
-              ? profile.bio
-              : `${profile.name} is building consistency with a ${formatGoal(profile.goal).toLowerCase()} focus.`}
-          </p>
-          <div className="chip-row">
-            <span className="chip">{formatGoal(profile.goal)}</span>
-            <span className="chip">{formatExperience(profile.experience)}</span>
-            <span className="chip">{formatTimePreference(profile.preferredTime)}</span>
-            {profile.gym && <span className="chip">{profile.gym}</span>}
+        <div className="hero-profile">
+          <Avatar name={profile.name} avatarUrl={profile.avatarUrl} size="lg" />
+          <div>
+            <span className="eyebrow">{isSelf ? "My profile" : "Public profile"}</span>
+            <h1>{profile.name}</h1>
+            <p>
+              {profile.bio?.trim()
+                ? profile.bio
+                : `${profile.name} is building consistency with a ${formatGoal(profile.goal).toLowerCase()} focus.`}
+            </p>
+            <div className="chip-row">
+              <span className="chip">{formatGoal(profile.goal)}</span>
+              <span className="chip">{formatExperience(profile.experience)}</span>
+              <span className="chip">{formatTimePreference(profile.preferredTime)}</span>
+              {profile.gym && <span className="chip">{profile.gym}</span>}
+              {profile.locationLabel && <span className="chip">{profile.locationLabel}</span>}
+            </div>
           </div>
         </div>
 
@@ -63,9 +104,23 @@ export default function Profile() {
               Edit Profile
             </button>
           ) : (
-            <button className="btn btn-primary" onClick={() => navigate(`/chat/${profile.id}`)}>
-              {profile.relationship?.hasMessaged ? "Open Chat" : "Start Conversation"}
-            </button>
+            <>
+              <button
+                className="btn btn-primary"
+                onClick={() =>
+                  navigate(`/chat/${profile.id}`, {
+                    state: aiIntro ? { draftMessage: aiIntro } : undefined,
+                  })
+                }
+              >
+                {profile.relationship?.hasMessaged ? "Open Chat" : "Start Conversation"}
+              </button>
+              {!profile.relationship?.hasMessaged && (
+                <button className="btn btn-secondary" onClick={handleGenerateIntro} disabled={aiIntroLoading}>
+                  {aiIntroLoading ? "Thinking..." : aiIntro ? "Regenerate AI Intro" : "AI Intro"}
+                </button>
+              )}
+            </>
           )}
           <button className="btn btn-secondary" onClick={() => navigate("/matches")}>
             Back to Matches
@@ -116,11 +171,30 @@ export default function Profile() {
               <span>Gym / location</span>
               <strong>{profile.gym || "Not shared"}</strong>
             </div>
+            <div>
+              <span>Exact training area</span>
+              <strong>{profile.locationLabel || profile.city || "Not shared"}</strong>
+            </div>
           </div>
 
           {!isSelf && profile.relationship?.sameGym && (
             <div className="feedback success">
               You both train at the same gym or location, which is a strong signal for coordination.
+            </div>
+          )}
+
+          {locationMapUrl && (
+            <div className="action-row">
+              <a className="btn btn-secondary" href={locationMapUrl} target="_blank" rel="noreferrer">
+                Open Training Location
+              </a>
+            </div>
+          )}
+
+          {!isSelf && aiIntro && (
+            <div className="feedback success">
+              <strong>AI intro ready</strong>
+              <p>{aiIntro}</p>
             </div>
           )}
         </div>

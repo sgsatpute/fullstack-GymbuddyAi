@@ -42,6 +42,41 @@ if (!userCols.some((column) => column.name === "bio")) {
   console.log("Added bio column");
 }
 
+if (!userCols.some((column) => column.name === "avatarUrl")) {
+  db.exec("ALTER TABLE users ADD COLUMN avatarUrl TEXT");
+  console.log("Added avatarUrl column");
+}
+
+if (!userCols.some((column) => column.name === "city")) {
+  db.exec("ALTER TABLE users ADD COLUMN city TEXT");
+  console.log("Added city column");
+}
+
+if (!userCols.some((column) => column.name === "lastCheckinTime")) {
+  db.exec("ALTER TABLE users ADD COLUMN lastCheckinTime TEXT");
+  console.log("Added lastCheckinTime column");
+}
+
+if (!userCols.some((column) => column.name === "locationLabel")) {
+  db.exec("ALTER TABLE users ADD COLUMN locationLabel TEXT");
+  console.log("Added locationLabel column");
+}
+
+if (!userCols.some((column) => column.name === "locationPlaceId")) {
+  db.exec("ALTER TABLE users ADD COLUMN locationPlaceId TEXT");
+  console.log("Added locationPlaceId column");
+}
+
+if (!userCols.some((column) => column.name === "locationLat")) {
+  db.exec("ALTER TABLE users ADD COLUMN locationLat REAL");
+  console.log("Added locationLat column");
+}
+
+if (!userCols.some((column) => column.name === "locationLng")) {
+  db.exec("ALTER TABLE users ADD COLUMN locationLng REAL");
+  console.log("Added locationLng column");
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,6 +92,19 @@ if (!messageCols.some((column) => column.name === "seen")) {
   db.exec("ALTER TABLE messages ADD COLUMN seen INTEGER DEFAULT 0");
   console.log("Added seen column");
 }
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS message_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    messageId INTEGER NOT NULL,
+    userId INTEGER NOT NULL,
+    emoji TEXT NOT NULL,
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (messageId) REFERENCES messages(id),
+    FOREIGN KEY (userId) REFERENCES users(id),
+    UNIQUE(messageId, userId, emoji)
+  )
+`);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS match_feedback (
@@ -83,6 +131,107 @@ db.exec(`
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_checkins_user_date
   ON checkins(userId, checkInDate)
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS coach_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id)
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS workout_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    sessionDate TEXT NOT NULL,
+    workoutType TEXT NOT NULL,
+    focusArea TEXT NOT NULL,
+    durationMinutes INTEGER NOT NULL,
+    intensity TEXT NOT NULL,
+    energy INTEGER DEFAULT 3,
+    notes TEXT,
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id)
+  )
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_workout_sessions_user_date
+  ON workout_sessions(userId, sessionDate)
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS meal_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    mealDate TEXT NOT NULL,
+    mealType TEXT NOT NULL,
+    title TEXT NOT NULL,
+    calories INTEGER NOT NULL DEFAULT 0,
+    proteinGrams REAL NOT NULL DEFAULT 0,
+    carbsGrams REAL NOT NULL DEFAULT 0,
+    fatGrams REAL NOT NULL DEFAULT 0,
+    fiberGrams REAL NOT NULL DEFAULT 0,
+    notes TEXT,
+    imageUrl TEXT,
+    source TEXT NOT NULL DEFAULT 'manual',
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id)
+  )
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_meal_entries_user_date
+  ON meal_entries(userId, mealDate)
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS badges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    badgeType TEXT NOT NULL,
+    earnedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id),
+    UNIQUE(userId, badgeType)
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS activity_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    actionType TEXT NOT NULL,
+    metadata TEXT,
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id)
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS blocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    accuserId INTEGER NOT NULL,
+    accusedId INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('block', 'report')),
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (accuserId) REFERENCES users(id),
+    FOREIGN KEY (accusedId) REFERENCES users(id)
+  )
+`);
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_blocks_unique_action
+  ON blocks(accuserId, accusedId, type)
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_blocks_lookup
+  ON blocks(accuserId, accusedId, type)
 `);
 
 db.exec(`
@@ -125,6 +274,6 @@ db.exec(`
   ON password_reset_otps(userId)
 `);
 
-console.log("Database ready (users, chat, ML, sessions, password reset)");
+console.log("Database ready (users, chat, ML, workouts, sessions, password reset, safety)");
 
 export default db;

@@ -1,6 +1,9 @@
 import express from "express";
 import db from "../db.js";
 import auth from "../middleware/auth.js";
+import { getBlockedUserIds } from "../utils/relationships.js";
+import { requestAnthropicText } from "../utils/anthropic.js";
+import { buildMapsDirectionsLink, calculateDistanceKm } from "../utils/location.js";
 
 const router = express.Router();
 
@@ -11,10 +14,33 @@ function normalize(value) {
 function buildMatch(me, other) {
   let score = 25;
   const reasons = [];
+  const sameGym =
+    normalize(me.gym) && normalize(me.gym) === normalize(other.gym);
+  const sameCity =
+    normalize(me.city) && normalize(me.city) === normalize(other.city);
+  const distanceKm = calculateDistanceKm(me, other);
 
-  if (normalize(me.gym) && normalize(me.gym) === normalize(other.gym)) {
+  if (sameGym) {
     score += 28;
     reasons.push("Same gym or training location");
+  }
+
+  if (!sameGym && distanceKm !== null) {
+    if (distanceKm <= 2) {
+      score += 18;
+      reasons.push("Very close training locations");
+    } else if (distanceKm <= 6) {
+      score += 14;
+      reasons.push("Close enough to train together easily");
+    } else if (distanceKm <= 12) {
+      score += 9;
+      reasons.push("Reasonable commute between training spots");
+    } else if (distanceKm <= 20) {
+      score += 4;
+    }
+  } else if (!sameGym && sameCity) {
+    score += 6;
+    reasons.push("Same city or neighborhood");
   }
 
   if (normalize(me.goal) && normalize(me.goal) === normalize(other.goal)) {
@@ -67,14 +93,23 @@ function buildMatch(me, other) {
     reasons,
     tier,
     canChat: compatibility >= 60,
+    distanceKm,
+    locationInsight:
+      distanceKm !== null
+        ? other.locationLabel || other.city || `${distanceKm} km apart`
+        : sameCity
+          ? "Same city"
+          : other.locationLabel || other.city || "",
+    mapsUrl: buildMapsDirectionsLink(other),
   };
 }
 
 router.get("/", auth, (req, res) => {
   const userId = req.user.id;
+  const blockedUserIds = getBlockedUserIds(userId);
 
   const me = db.prepare(`
-    SELECT id, name, age, gym, goal, experience, preferredTime, streak, consistency, xp, level, bio
+    SELECT id, name, age, gym, city, goal, experience, preferredTime, streak, consistency, xp, level, bio, avatarUrl, locationLabel, locationLat, locationLng
     FROM users
     WHERE id = ?
   `).get(userId);
@@ -90,16 +125,20 @@ router.get("/", auth, (req, res) => {
     return res.status(400).json({ error: "PROFILE_INCOMPLETE" });
   }
 
-  const others = db.prepare(`
-    SELECT id, name, age, gym, goal, experience, preferredTime, streak, consistency, xp, level, bio
+  const placeholders = blockedUserIds.map(() => "?").join(", ");
+  const othersQuery = `
+    SELECT id, name, age, gym, city, goal, experience, preferredTime, streak, consistency, xp, level, bio, avatarUrl, locationLabel, locationLat, locationLng
     FROM users
     WHERE id != ?
+      ${blockedUserIds.length > 0 ? `AND id NOT IN (${placeholders})` : ""}
       AND age IS NOT NULL
       AND gym IS NOT NULL
       AND goal IS NOT NULL
       AND experience IS NOT NULL
       AND preferredTime IS NOT NULL
-  `).all(userId);
+  `;
+
+  const others = db.prepare(othersQuery).all(userId, ...blockedUserIds);
 
   const matches = others
     .map((other) => {
@@ -112,6 +151,56 @@ router.get("/", auth, (req, res) => {
     .sort((a, b) => b.score - a.score);
 
   res.json(matches);
+});
+
+router.post("/:id/intro", auth, async (req, res) => {
+  try {
+    const myId = req.user.id;
+    const otherId = Number(req.params.id);
+
+    if (!Number.isInteger(otherId)) {
+      return res.status(400).json({ error: "Invalid user id" });
+    }
+
+    const blockedUserIds = getBlockedUserIds(myId);
+    if (blockedUserIds.includes(otherId)) {
+      return res.status(403).json({ error: "This user is unavailable." });
+    }
+
+    const me = db.prepare(`
+      SELECT id, name, age, gym, city, goal, experience, preferredTime, streak, consistency, xp, level, bio, avatarUrl, locationLabel, locationLat, locationLng
+      FROM users
+      WHERE id = ?
+    `).get(myId);
+
+    const other = db.prepare(`
+      SELECT id, name, age, gym, city, goal, experience, preferredTime, streak, consistency, xp, level, bio, avatarUrl, locationLabel, locationLat, locationLng
+      FROM users
+      WHERE id = ?
+    `).get(otherId);
+
+    if (!me || !other) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const match = buildMatch(me, other);
+    const fallbackText = `Hey ${other.name}, looks like we both ${String(match.reasons[0] ?? "train on a similar schedule").toLowerCase()}. Want to team up for a session sometime?`;
+    const message = await requestAnthropicText({
+      system: "Write short, casual, friendly gym buddy intro messages. One sentence only. No emojis.",
+      messages: [
+        {
+          role: "user",
+          content: `Write intro from ${me.name} to ${other.name}. They both ${match.reasons[0] ?? "have similar training goals"}, train ${me.preferredTime}, goal: ${me.goal}.`,
+        },
+      ],
+      maxTokens: 80,
+      fallbackText,
+    });
+
+    res.json({ message });
+  } catch {
+    res.status(500).json({ error: "Failed to generate intro" });
+  }
 });
 
 export default router;

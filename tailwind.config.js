@@ -1,8 +1,15 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ["./client/index.html", "./client/src/**/*.{js,ts,jsx,tsx}"],
+  content: ["./client/index.html", "./client/src/**/*.{ts,tsx}"],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        surface: "#13131a",
+        surface2: "#1c1c27",
+        accent: "#7c6ef5",
+        accent2: "#00d4aa",
+      },
+    },
   },
   plugins: [],
 };
