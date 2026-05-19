@@ -12,6 +12,8 @@ export default function CompleteProfile() {
 
   const [age, setAge] = useState<number | "">("");
   const [gym, setGym] = useState("");
+  const [city, setCity] = useState("");
+  const [locationLabel, setLocationLabel] = useState("");
   const [goal, setGoal] = useState("muscle");
   const [experience, setExperience] = useState("beginner");
   const [preferredTime, setPreferredTime] = useState("morning");
@@ -24,6 +26,8 @@ export default function CompleteProfile() {
         setProfile(user);
         if (user.age) setAge(user.age);
         if (user.gym) setGym(user.gym);
+        if (user.city) setCity(user.city);
+        if (user.locationLabel) setLocationLabel(user.locationLabel);
         if (user.goal) setGoal(user.goal);
         if (user.experience) setExperience(user.experience);
         if (user.preferredTime) setPreferredTime(user.preferredTime);
@@ -36,7 +40,7 @@ export default function CompleteProfile() {
   async function saveProfile() {
     setError("");
 
-    if (!age || !gym || !goal || !experience || !preferredTime) {
+    if (!age || !gym || !city || !goal || !experience || !preferredTime) {
       setError("Please complete the required fields.");
       return;
     }
@@ -46,7 +50,7 @@ export default function CompleteProfile() {
     try {
       const response = await apiFetch("/api/users/profile", {
         method: "POST",
-        body: JSON.stringify({ age, gym, goal, experience, preferredTime, bio }),
+        body: JSON.stringify({ age, gym, city, goal, experience, preferredTime, bio, locationLabel }),
       });
 
       if (!response.ok) {
@@ -112,6 +116,27 @@ export default function CompleteProfile() {
               value={gym}
               onChange={(event) => setGym(event.target.value)}
             />
+          </label>
+
+          <label className="field">
+            <span>City / neighborhood</span>
+            <input
+              placeholder="Mumbai, Andheri West"
+              value={city}
+              onChange={(event) => setCity(event.target.value)}
+            />
+          </label>
+
+          <label className="field field-full">
+            <span>Exact training landmark or address</span>
+            <input
+              placeholder="Gold's Gym Lokhandwala or Andheri Sports Complex"
+              value={locationLabel}
+              onChange={(event) => setLocationLabel(event.target.value)}
+            />
+            <small className="tiny-muted">
+              This helps the Maps-powered matcher estimate travel distance more accurately.
+            </small>
           </label>
 
           <label className="field">
