@@ -15,7 +15,8 @@ describe("Authentication API", () => {
       .send(testUser);
 
     expect(res.status).toBe(201);
-    expect(res.body).toHaveProperty("token");
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty("token");
   });
 
   it("should reject registration with duplicate email", async () => {
@@ -34,7 +35,8 @@ describe("Authentication API", () => {
       });
 
     expect(res.status).toBe(409);
-    expect(res.body).toHaveProperty("error");
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toHaveProperty("message");
   });
 
   it("should reject registration with invalid email format", async () => {
@@ -47,7 +49,8 @@ describe("Authentication API", () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain("email");
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toContain("email");
   });
 
   it("should reject registration with password less than 8 chars", async () => {
@@ -60,7 +63,8 @@ describe("Authentication API", () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain("Password");
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toContain("Password");
   });
 
   it("should login successfully with correct credentials", async () => {
@@ -78,7 +82,8 @@ describe("Authentication API", () => {
       });
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty("token");
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty("token");
   });
 
   it("should reject login with wrong password", async () => {
@@ -94,7 +99,8 @@ describe("Authentication API", () => {
       });
 
     expect(res.status).toBe(401);
-    expect(res.body).toHaveProperty("error");
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toHaveProperty("message");
   });
 
   it("should reject login with non-existent email", async () => {
@@ -106,7 +112,8 @@ describe("Authentication API", () => {
       });
 
     expect(res.status).toBe(401);
-    expect(res.body).toHaveProperty("error");
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toHaveProperty("message");
   });
 
   it("should return JWT token on successful login", async () => {
@@ -122,8 +129,9 @@ describe("Authentication API", () => {
       });
 
     expect(res.status).toBe(200);
-    expect(res.body.token).toBeTypeOf("string");
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.token).toBeTypeOf("string");
     // Verify it is a valid looking token (3 segments separated by dots)
-    expect(res.body.token.split(".").length).toBe(3);
+    expect(res.body.data.token.split(".").length).toBe(3);
   });
 });

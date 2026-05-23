@@ -13,7 +13,7 @@ describe("Messages API", () => {
         email: "usera@example.com",
         password: "password123",
       });
-    const tokenA = resA.body.token;
+    const tokenA = resA.body.data.token;
 
     const resB = await request(app)
       .post("/api/auth/register")
@@ -51,7 +51,7 @@ describe("Messages API", () => {
         email: "userc@example.com",
         password: "password123",
       });
-    const tokenA = resA.body.token;
+    const tokenA = resA.body.data.token;
     const userCId = db.prepare("SELECT id FROM users WHERE email = 'userc@example.com'").get().id;
 
     await request(app)
@@ -89,7 +89,7 @@ describe("Messages API", () => {
         email: "usere@example.com",
         password: "password123",
       });
-    const tokenA = resA.body.token;
+    const tokenA = resA.body.data.token;
 
     await request(app)
       .post("/api/auth/register")

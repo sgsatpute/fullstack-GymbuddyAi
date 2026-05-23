@@ -18,7 +18,7 @@ describe("Leaderboard API", () => {
         email: "test@example.com",
         password: "password123",
       });
-    const token = regRes.body.token;
+    const token = regRes.body.data.token;
 
     // 2. Insert multiple users directly into database with different XP values
     for (let i = 1; i <= 15; i++) {
@@ -36,7 +36,6 @@ describe("Leaderboard API", () => {
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("users");
     expect(res.body).toHaveProperty("leaders");
-    // Ensure we get users (our code slices at 50 max, so we expect 16 total users)
     expect(res.body.users.length).toBeLessThanOrEqual(50);
     expect(res.body.total).toBe(16);
   });
@@ -50,7 +49,7 @@ describe("Leaderboard API", () => {
         email: "test2@example.com",
         password: "password123",
       });
-    const token = regRes.body.token;
+    const token = regRes.body.data.token;
 
     // 2. Insert users with different XP
     db.prepare("INSERT INTO users (name, email, passwordHash, xp) VALUES ('Low XP', 'low@example.com', 'hash', 10)").run();
