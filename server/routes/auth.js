@@ -2,6 +2,9 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import config from "../config.js";
 import db from "../db.js";
+import AppError from "../utils/AppError.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import logger from "../utils/logger.js";
 import {
   authLimiter,
   passwordResetLimiter,
@@ -34,71 +37,92 @@ function validatePassword(password) {
   return typeof password === "string" && password.trim().length >= 8;
 }
 
-router.post("/register", authLimiter, async (req, res) => {
+function validateEmailFormat(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
+router.post("/register", authLimiter, asyncHandler(async (req, res) => {
+  cleanupExpiredAuthArtifacts();
+
+  const name = (req.body.name ?? "").trim();
+  const email = normalizeEmail(req.body.email);
+  const password = req.body.password ?? "";
+
+  if (!name || !email || !password) {
+    logger.warn("Registration attempt failed: Missing fields", { requestId: req.id, ip: req.ip });
+    throw new AppError("All fields required", 400, "VALIDATION_ERROR");
+  }
+
+  if (!validateEmailFormat(email)) {
+    logger.warn(`Registration attempt failed: Invalid email format (${email})`, { requestId: req.id, email, ip: req.ip });
+    throw new AppError("Invalid email format", 400, "VALIDATION_ERROR");
+  }
+
+  if (!validatePassword(password)) {
+    logger.warn(`Registration attempt failed: Password too short (${email})`, { requestId: req.id, email, ip: req.ip });
+    throw new AppError("Password must be at least 8 characters long", 400, "VALIDATION_ERROR");
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  let result;
   try {
-    cleanupExpiredAuthArtifacts();
-
-    const name = (req.body.name ?? "").trim();
-    const email = normalizeEmail(req.body.email);
-    const password = req.body.password ?? "";
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "All fields required" });
-    }
-
-    if (!validatePassword(password)) {
-      return res.status(400).json({
-        error: "Password must be at least 8 characters long",
-      });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const result = db.prepare(`
+    result = db.prepare(`
       INSERT INTO users (name, email, passwordHash)
       VALUES (?, ?, ?)
     `).run(name, email, passwordHash);
-
-    const user = db.prepare(`
-      SELECT id, name, email
-      FROM users
-      WHERE id = ?
-    `).get(result.lastInsertRowid);
-
-    const session = issueSession({
-      user,
-      res,
-      requestMeta: getRequestMeta(req),
-    });
-
-    res.status(201).json({ token: session.token });
   } catch (error) {
     if (error.message.includes("UNIQUE")) {
-      return res.status(409).json({ error: "Email already exists" });
+      logger.warn(`Registration attempt failed: Email already exists (${email})`, { requestId: req.id, email, ip: req.ip });
+      throw new AppError("Email already exists", 409, "DATABASE_ERROR");
     }
-
-    res.status(500).json({ error: "Registration failed" });
+    logger.error("Registration database error", { requestId: req.id, error: error.message, stack: error.stack });
+    throw error;
   }
-});
 
-router.post("/login", authLimiter, async (req, res) => {
+  const user = db.prepare(`
+    SELECT id, name, email
+    FROM users
+    WHERE id = ?
+  `).get(result.lastInsertRowid);
+
+  const session = issueSession({
+    user,
+    res,
+    requestMeta: getRequestMeta(req),
+  });
+
+  logger.info(`User registered successfully: ${email}`, { requestId: req.id, userId: user.id, email });
+
+  res.status(201).json({
+    success: true,
+    data: { token: session.token },
+    message: "Registration successful"
+  });
+}));
+
+router.post("/login", authLimiter, asyncHandler(async (req, res) => {
   cleanupExpiredAuthArtifacts();
 
   const email = normalizeEmail(req.body.email);
   const password = req.body.password ?? "";
 
   if (!email || !password) {
-    return res.status(400).json({ error: "Email and password required" });
+    logger.warn("Login attempt failed: Missing email or password", { requestId: req.id, ip: req.ip });
+    throw new AppError("Email and password required", 400, "VALIDATION_ERROR");
   }
 
   const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
   if (!user) {
-    return res.status(401).json({ error: "Invalid credentials" });
+    logger.warn(`Login attempt failed: Email not found (${email})`, { requestId: req.id, email, ip: req.ip });
+    throw new AppError("Invalid credentials", 401, "AUTHENTICATION_ERROR");
   }
 
   const passwordMatches = await bcrypt.compare(password, user.passwordHash);
   if (!passwordMatches) {
-    return res.status(401).json({ error: "Invalid credentials" });
+    logger.warn(`Login attempt failed: Wrong password (${email})`, { requestId: req.id, email, ip: req.ip });
+    throw new AppError("Invalid credentials", 401, "AUTHENTICATION_ERROR");
   }
 
   db.prepare(`
@@ -114,8 +138,14 @@ router.post("/login", authLimiter, async (req, res) => {
     requestMeta: getRequestMeta(req),
   });
 
-  res.json({ token: session.token });
-});
+  logger.info(`User logged in successfully: ${email}`, { requestId: req.id, userId: user.id, email });
+
+  res.json({
+    success: true,
+    data: { token: session.token },
+    message: "Login successful"
+  });
+}));
 
 router.post("/refresh", authLimiter, (req, res) => {
   cleanupExpiredAuthArtifacts();

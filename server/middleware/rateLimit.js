@@ -5,6 +5,7 @@ const baseLimiterConfig = {
   windowMs: config.rateLimitWindowMs,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
 };
 
 export const apiLimiter = rateLimit({
