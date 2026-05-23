@@ -104,6 +104,10 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(config.port, () => {
-  console.log(`Server + Socket running on http://localhost:${config.port}`);
-});
+if (process.env.NODE_ENV !== "test") {
+  server.listen(config.port, () => {
+    console.log(`Server + Socket running on http://localhost:${config.port}`);
+  });
+}
+
+export { app, server };

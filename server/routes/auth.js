@@ -34,6 +34,11 @@ function validatePassword(password) {
   return typeof password === "string" && password.trim().length >= 8;
 }
 
+function validateEmailFormat(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
 router.post("/register", authLimiter, async (req, res) => {
   try {
     cleanupExpiredAuthArtifacts();
@@ -44,6 +49,10 @@ router.post("/register", authLimiter, async (req, res) => {
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: "All fields required" });
+    }
+
+    if (!validateEmailFormat(email)) {
+      return res.status(400).json({ error: "Invalid email format" });
     }
 
     if (!validatePassword(password)) {
