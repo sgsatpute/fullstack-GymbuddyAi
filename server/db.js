@@ -274,6 +274,29 @@ db.exec(`
   ON password_reset_otps(userId)
 `);
 
-console.log("Database ready (users, chat, ML, workouts, sessions, password reset, safety)");
+db.exec(`
+  CREATE TABLE IF NOT EXISTS match_interactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    viewerId INTEGER NOT NULL,
+    viewedId INTEGER NOT NULL,
+    action TEXT NOT NULL CHECK(action IN ('view', 'like', 'pass', 'message')),
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (viewerId) REFERENCES users(id),
+    FOREIGN KEY (viewedId) REFERENCES users(id),
+    UNIQUE(viewerId, viewedId, action, createdAt)
+  )
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_match_interactions_viewer
+  ON match_interactions(viewerId, createdAt)
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_match_interactions_viewed
+  ON match_interactions(viewedId, createdAt)
+`);
+
+console.log("Database ready (users, chat, ML, workouts, sessions, password reset, safety, smart matching)");
 
 export default db;
