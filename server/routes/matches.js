@@ -4,11 +4,6 @@ import auth from "../middleware/auth.js";
 import { getBlockedUserIds } from "../utils/relationships.js";
 import { requestAnthropicText } from "../utils/anthropic.js";
 import { buildMapsDirectionsLink, calculateDistanceKm } from "../utils/location.js";
-import {
-  rankMatches,
-  getMatchBreakdown,
-  logMatchInteraction,
-} from "../utils/smartMatch.js";
 
 const router = express.Router();
 
@@ -16,43 +11,146 @@ function normalize(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-router.get("/", auth, (req, res) => {
-  const userId = req.user.id;
+function buildMatch(me, other) {
+  let score = 25;
+  const reasons = [];
+  const sameGym =
+    normalize(me.gym) && normalize(me.gym) === normalize(other.gym);
+  const sameCity =
+    normalize(me.city) && normalize(me.city) === normalize(other.city);
+  const distanceKm = calculateDistanceKm(me, other);
 
-  // Use smart matching engine
-  const result = rankMatches(userId, 50);
-
-  if (result.error) {
-    return res.status(result.error === "PROFILE_INCOMPLETE" ? 400 : 404).json({
-      error: result.error,
-    });
+  if (sameGym) {
+    score += 28;
+    reasons.push("Same gym or training location");
   }
 
-  // Enhance matches with location insights and additional data
-  const enhancedMatches = result.matches.map((match) => {
-    const distanceKm = calculateDistanceKm(
-      { locationLat: req.user.locationLat, locationLng: req.user.locationLng },
-      { locationLat: match.locationLat, locationLng: match.locationLng }
-    );
+  if (!sameGym && distanceKm !== null) {
+    if (distanceKm <= 2) {
+      score += 18;
+      reasons.push("Very close training locations");
+    } else if (distanceKm <= 6) {
+      score += 14;
+      reasons.push("Close enough to train together easily");
+    } else if (distanceKm <= 12) {
+      score += 9;
+      reasons.push("Reasonable commute between training spots");
+    } else if (distanceKm <= 20) {
+      score += 4;
+    }
+  } else if (!sameGym && sameCity) {
+    score += 6;
+    reasons.push("Same city or neighborhood");
+  }
 
-    const mapsUrl = buildMapsDirectionsLink({
-      locationLabel: match.locationLabel,
-      city: match.city,
-    });
+  if (normalize(me.goal) && normalize(me.goal) === normalize(other.goal)) {
+    score += 22;
+    reasons.push("Aligned fitness goal");
+  }
 
-    return {
-      user: match,
-      score: match.compatibility,
-      tier: match.tier,
-      canChat: match.canChat,
-      reasons: match.tier === "Elite match" ? ["Perfect compatibility"] : [],
-      distanceKm,
-      locationInsight: match.locationLabel || match.city || "",
-      mapsUrl,
-    };
-  });
+  if (normalize(me.experience) && normalize(me.experience) === normalize(other.experience)) {
+    score += 16;
+    reasons.push("Similar experience level");
+  }
 
-  res.json(enhancedMatches);
+  if (
+    normalize(me.preferredTime) &&
+    normalize(me.preferredTime) === normalize(other.preferredTime)
+  ) {
+    score += 16;
+    reasons.push("Workout schedules line up");
+  }
+
+  if (Number.isFinite(me.age) && Number.isFinite(other.age)) {
+    const ageGap = Math.abs(me.age - other.age);
+    if (ageGap <= 3) {
+      score += 8;
+      reasons.push("Very similar age range");
+    } else if (ageGap <= 6) {
+      score += 4;
+    }
+  }
+
+  const streakGap = Math.abs((me.streak ?? 0) - (other.streak ?? 0));
+  if (streakGap <= 3) {
+    score += 5;
+    reasons.push("Consistency is on a similar track");
+  }
+
+  const compatibility = Math.min(99, Math.max(0, score));
+  let tier = "Potential fit";
+
+  if (compatibility >= 85) {
+    tier = "Elite match";
+  } else if (compatibility >= 72) {
+    tier = "Strong match";
+  } else if (compatibility >= 60) {
+    tier = "Good fit";
+  }
+
+  return {
+    score: compatibility,
+    reasons,
+    tier,
+    canChat: compatibility >= 60,
+    distanceKm,
+    locationInsight:
+      distanceKm !== null
+        ? other.locationLabel || other.city || `${distanceKm} km apart`
+        : sameCity
+          ? "Same city"
+          : other.locationLabel || other.city || "",
+    mapsUrl: buildMapsDirectionsLink(other),
+  };
+}
+
+router.get("/", auth, (req, res) => {
+  const userId = req.user.id;
+  const blockedUserIds = getBlockedUserIds(userId);
+
+  const me = db.prepare(`
+    SELECT id, name, age, gym, city, goal, experience, preferredTime, streak, consistency, xp, level, bio, avatarUrl, locationLabel, locationLat, locationLng
+    FROM users
+    WHERE id = ?
+  `).get(userId);
+
+  if (!me) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const required = ["age", "gym", "goal", "experience", "preferredTime"];
+  const incomplete = required.some((key) => me[key] === null || me[key] === undefined || me[key] === "");
+
+  if (incomplete) {
+    return res.status(400).json({ error: "PROFILE_INCOMPLETE" });
+  }
+
+  const placeholders = blockedUserIds.map(() => "?").join(", ");
+  const othersQuery = `
+    SELECT id, name, age, gym, city, goal, experience, preferredTime, streak, consistency, xp, level, bio, avatarUrl, locationLabel, locationLat, locationLng
+    FROM users
+    WHERE id != ?
+      ${blockedUserIds.length > 0 ? `AND id NOT IN (${placeholders})` : ""}
+      AND age IS NOT NULL
+      AND gym IS NOT NULL
+      AND goal IS NOT NULL
+      AND experience IS NOT NULL
+      AND preferredTime IS NOT NULL
+  `;
+
+  const others = db.prepare(othersQuery).all(userId, ...blockedUserIds);
+
+  const matches = others
+    .map((other) => {
+      const match = buildMatch(me, other);
+      return {
+        user: other,
+        ...match,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  res.json(matches);
 });
 
 router.post("/:id/intro", auth, async (req, res) => {
@@ -85,14 +183,14 @@ router.post("/:id/intro", auth, async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const breakdown = getMatchBreakdown(myId, otherId);
-    const fallbackText = `Hey ${other.name}, looks like we both ${String(breakdown?.reasons?.[0] ?? "train on a similar schedule").toLowerCase()}. Want to team up for a session sometime?`;
+    const match = buildMatch(me, other);
+    const fallbackText = `Hey ${other.name}, looks like we both ${String(match.reasons[0] ?? "train on a similar schedule").toLowerCase()}. Want to team up for a session sometime?`;
     const message = await requestAnthropicText({
       system: "Write short, casual, friendly gym buddy intro messages. One sentence only. No emojis.",
       messages: [
         {
           role: "user",
-          content: `Write intro from ${me.name} to ${other.name}. They both ${breakdown?.reasons?.[0] ?? "have similar training goals"}, train ${me.preferredTime}, goal: ${me.goal}.`,
+          content: `Write intro from ${me.name} to ${other.name}. They both ${match.reasons[0] ?? "have similar training goals"}, train ${me.preferredTime}, goal: ${me.goal}.`,
         },
       ],
       maxTokens: 80,
@@ -102,48 +200,6 @@ router.post("/:id/intro", auth, async (req, res) => {
     res.json({ message });
   } catch {
     res.status(500).json({ error: "Failed to generate intro" });
-  }
-});
-
-router.get("/:id/compatibility", auth, (req, res) => {
-  try {
-    const myId = req.user.id;
-    const otherId = Number(req.params.id);
-
-    if (!Number.isInteger(otherId)) {
-      return res.status(400).json({ error: "Invalid user id" });
-    }
-
-    const breakdown = getMatchBreakdown(myId, otherId);
-    if (!breakdown) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    logMatchInteraction(myId, otherId, "view");
-    res.json(breakdown);
-  } catch {
-    res.status(500).json({ error: "Failed to get compatibility" });
-  }
-});
-
-router.post("/:id/interaction", auth, (req, res) => {
-  try {
-    const myId = req.user.id;
-    const otherId = Number(req.params.id);
-    const { action } = req.body;
-
-    if (!Number.isInteger(otherId)) {
-      return res.status(400).json({ error: "Invalid user id" });
-    }
-
-    if (!["view", "like", "pass", "message"].includes(action)) {
-      return res.status(400).json({ error: "Invalid action" });
-    }
-
-    logMatchInteraction(myId, otherId, action);
-    res.json({ success: true, action, timestamp: new Date().toISOString() });
-  } catch {
-    res.status(500).json({ error: "Failed to log interaction" });
   }
 });
 
