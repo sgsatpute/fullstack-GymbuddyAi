@@ -1,11 +1,43 @@
-node_modules
-dist
-.DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
+# 1. Node modules
+node_modules/
+**/node_modules/
+
+# 2. Database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+**/gymbuddy.db
+
+# 3. Model files
+*.pkl
+**/*.pkl
+
+# 4. Environment files
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.production.example
+
+# 5. Build/distribution folders
+dist/
+build/
+
+# 6. OS metadata
+.DS_Store
+Thumbs.db
+[Dd]ownloads/
+
+# 7. Testing coverage
+coverage/
+
+# 8. Logs
+logs/
 *.log
-server/uploads/
+
+# 9. Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
