@@ -21,6 +21,8 @@ import leaderboardRoutes from "./routes/leaderboard.js";
 import workoutRoutes from "./routes/workouts.js";
 import nutritionRoutes from "./routes/nutrition.js";
 import errorHandler from "./middleware/errorHandler.js";
+import requestLogger from "./middleware/requestLogger.js";
+import db from "./db.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -37,6 +39,7 @@ const io = new Server(server, {
 
 app.use(cookieParser());
 app.use(express.json());
+app.use(requestLogger);
 app.use("/api", apiLimiter);
 app.use("/avatars", express.static(avatarUploadsDir));
 app.use("/foods", express.static(foodUploadsDir));
@@ -55,7 +58,23 @@ app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/workouts", workoutRoutes);
 app.use("/api/nutrition", nutritionRoutes);
 
-app.get("/api/health", (_, res) => res.json({ status: "OK" }));
+app.get("/api/health", (_, res) => {
+  let dbStatus = "disconnected";
+  try {
+    db.prepare("SELECT 1").get();
+    dbStatus = "connected";
+  } catch (e) {
+    dbStatus = "disconnected";
+  }
+
+  res.json({
+    status: "ok",
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+    environment: config.nodeEnv,
+    database: dbStatus,
+  });
+});
 
 app.use(errorHandler);
 

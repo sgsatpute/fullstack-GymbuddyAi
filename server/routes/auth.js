@@ -4,6 +4,7 @@ import config from "../config.js";
 import db from "../db.js";
 import AppError from "../utils/AppError.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import logger from "../utils/logger.js";
 import {
   authLimiter,
   passwordResetLimiter,
@@ -49,14 +50,17 @@ router.post("/register", authLimiter, asyncHandler(async (req, res) => {
   const password = req.body.password ?? "";
 
   if (!name || !email || !password) {
+    logger.warn("Registration attempt failed: Missing fields", { requestId: req.id, ip: req.ip });
     throw new AppError("All fields required", 400, "VALIDATION_ERROR");
   }
 
   if (!validateEmailFormat(email)) {
+    logger.warn(`Registration attempt failed: Invalid email format (${email})`, { requestId: req.id, email, ip: req.ip });
     throw new AppError("Invalid email format", 400, "VALIDATION_ERROR");
   }
 
   if (!validatePassword(password)) {
+    logger.warn(`Registration attempt failed: Password too short (${email})`, { requestId: req.id, email, ip: req.ip });
     throw new AppError("Password must be at least 8 characters long", 400, "VALIDATION_ERROR");
   }
 
@@ -70,8 +74,10 @@ router.post("/register", authLimiter, asyncHandler(async (req, res) => {
     `).run(name, email, passwordHash);
   } catch (error) {
     if (error.message.includes("UNIQUE")) {
+      logger.warn(`Registration attempt failed: Email already exists (${email})`, { requestId: req.id, email, ip: req.ip });
       throw new AppError("Email already exists", 409, "DATABASE_ERROR");
     }
+    logger.error("Registration database error", { requestId: req.id, error: error.message, stack: error.stack });
     throw error;
   }
 
@@ -87,6 +93,8 @@ router.post("/register", authLimiter, asyncHandler(async (req, res) => {
     requestMeta: getRequestMeta(req),
   });
 
+  logger.info(`User registered successfully: ${email}`, { requestId: req.id, userId: user.id, email });
+
   res.status(201).json({
     success: true,
     data: { token: session.token },
@@ -101,16 +109,19 @@ router.post("/login", authLimiter, asyncHandler(async (req, res) => {
   const password = req.body.password ?? "";
 
   if (!email || !password) {
+    logger.warn("Login attempt failed: Missing email or password", { requestId: req.id, ip: req.ip });
     throw new AppError("Email and password required", 400, "VALIDATION_ERROR");
   }
 
   const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
   if (!user) {
+    logger.warn(`Login attempt failed: Email not found (${email})`, { requestId: req.id, email, ip: req.ip });
     throw new AppError("Invalid credentials", 401, "AUTHENTICATION_ERROR");
   }
 
   const passwordMatches = await bcrypt.compare(password, user.passwordHash);
   if (!passwordMatches) {
+    logger.warn(`Login attempt failed: Wrong password (${email})`, { requestId: req.id, email, ip: req.ip });
     throw new AppError("Invalid credentials", 401, "AUTHENTICATION_ERROR");
   }
 
@@ -126,6 +137,8 @@ router.post("/login", authLimiter, asyncHandler(async (req, res) => {
     res,
     requestMeta: getRequestMeta(req),
   });
+
+  logger.info(`User logged in successfully: ${email}`, { requestId: req.id, userId: user.id, email });
 
   res.json({
     success: true,
