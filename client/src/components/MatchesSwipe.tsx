@@ -1,25 +1,43 @@
-/**
- * PROMPT 6: Matches Swipe Cards
- * Tinder-style swipeable match cards with Framer Motion
- */
-
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 
-export const MatchCard = ({ user, onSwipe }) => {
+type SwipeDirection = "left" | "right";
+
+type SwipeUser = {
+  id: number;
+  name: string;
+  age: number;
+  avatar?: string;
+  gym?: string;
+  distance?: number;
+  compatibility?: number;
+  reasons?: string[];
+  bio?: string;
+  goal?: string;
+  experience?: string;
+  streak?: number;
+  isOnline?: boolean;
+};
+
+type MatchCardProps = {
+  user: SwipeUser;
+  onSwipe?: (userId: number, direction: SwipeDirection) => void;
+};
+
+export function MatchCard({ user, onSwipe }: MatchCardProps) {
   const [exitX, setExitX] = useState(0);
 
-  const handleSwipe = (direction) => {
+  function handleSwipe(direction: SwipeDirection) {
     setExitX(direction === "right" ? 500 : -500);
     onSwipe?.(user.id, direction);
-  };
+  }
 
   return (
     <motion.div
-      className="absolute w-full bg-surface2 rounded-2xl overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing"
+      className="absolute w-full cursor-grab overflow-hidden rounded-2xl bg-surface2 shadow-2xl active:cursor-grabbing"
       drag="x"
       dragConstraints={{ left: -300, right: 300 }}
-      onDragEnd={(e, info) => {
+      onDragEnd={(_event, info) => {
         if (info.offset.x > 100) {
           handleSwipe("right");
         } else if (info.offset.x < -100) {
@@ -29,79 +47,72 @@ export const MatchCard = ({ user, onSwipe }) => {
       exit={{ x: exitX, opacity: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
     >
-      {/* Image */}
-      <div className="relative w-full h-96 bg-gradient-to-b from-electric-500 to-navy-900">
+      <div className="relative h-96 w-full bg-gradient-to-b from-electric-500 to-navy-900">
         {user.avatar ? (
-          <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+          <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-6xl">👤</div>
+          <div className="flex h-full w-full items-center justify-center text-6xl">👤</div>
         )}
 
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
 
-        {/* Online Status */}
-        {user.isOnline && (
-          <div className="absolute top-4 right-4 flex items-center gap-2 bg-black bg-opacity-50 px-3 py-1 rounded-full text-sm">
-            <div className="status-online"></div>
+        {user.isOnline ? (
+          <div className="absolute right-4 top-4 flex items-center gap-2 rounded-full bg-black/50 px-3 py-1 text-sm">
+            <div className="status-online" />
             Online
           </div>
-        )}
+        ) : null}
 
-        {/* Compatibility Score */}
-        <div className="absolute top-4 left-4 bg-electric-500 text-white px-3 py-1 rounded-full font-bold text-sm">
-          {user.compatibility}% Match
+        <div className="absolute left-4 top-4 rounded-full bg-electric-500 px-3 py-1 text-sm font-bold text-white">
+          {user.compatibility ?? 0}% Match
         </div>
       </div>
 
-      {/* Info Section */}
       <div className="p-6">
         <div className="mb-4">
           <h2 className="text-2xl font-bold">
             {user.name}, {user.age}
           </h2>
-          <p className="text-accent text-sm">{user.gym} • {user.distance}km away</p>
+          <p className="text-sm text-accent">
+            {user.gym} • {user.distance ?? 0}km away
+          </p>
         </div>
 
-        {/* Compatibility Reasons */}
         <div className="mb-4 space-y-1">
-          {user.reasons?.map((reason, i) => (
-            <p key={i} className="text-sm text-gray-400 flex items-center gap-2">
+          {user.reasons?.map((reason, index) => (
+            <p key={`${reason}-${index}`} className="flex items-center gap-2 text-sm text-gray-400">
               <span className="text-electric-500">✓</span> {reason}
             </p>
           ))}
         </div>
 
-        {/* Bio */}
-        <p className="text-sm text-gray-300 line-clamp-2 mb-4">{user.bio}</p>
+        <p className="mb-4 line-clamp-2 text-sm text-gray-300">{user.bio}</p>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-surface rounded-lg text-center">
+        <div className="mb-4 grid grid-cols-3 gap-2 rounded-lg bg-surface p-3 text-center">
           <div>
             <p className="text-xs text-gray-400">Goal</p>
-            <p className="font-bold text-sm">{user.goal}</p>
+            <p className="text-sm font-bold">{user.goal}</p>
           </div>
           <div>
             <p className="text-xs text-gray-400">Level</p>
-            <p className="font-bold text-sm">{user.experience}</p>
+            <p className="text-sm font-bold">{user.experience}</p>
           </div>
           <div>
             <p className="text-xs text-gray-400">Streak</p>
-            <p className="font-bold text-sm">{user.streak}d 🔥</p>
+            <p className="text-sm font-bold">{user.streak}d 🔥</p>
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex gap-3">
           <button
             onClick={() => handleSwipe("left")}
-            className="flex-1 py-2 bg-surface rounded-lg hover:bg-surface2 transition text-white"
+            className="flex-1 rounded-lg bg-surface py-2 text-white transition hover:bg-surface2"
           >
             ✕ Pass
           </button>
           <button
             onClick={() => handleSwipe("right")}
-            className="flex-1 py-2 bg-electric-500 rounded-lg hover:bg-electric-600 transition text-white font-bold"
+            className="flex-1 rounded-lg bg-electric-500 py-2 font-bold text-white transition hover:bg-electric-600"
           >
             ❤ Like
           </button>
@@ -109,70 +120,45 @@ export const MatchCard = ({ user, onSwipe }) => {
       </div>
     </motion.div>
   );
+}
+
+type MatchesSwipeProps = {
+  matches?: SwipeUser[];
 };
 
-export const MatchesSwipe = ({ matches = [] }) => {
+export function MatchesSwipe({ matches = [] }: MatchesSwipeProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [displayMatches, setDisplayMatches] = useState(matches);
+  const [displayMatches] = useState(matches);
 
-  const handleSwipe = (userId, direction) => {
-    // Track interaction
+  function handleSwipe(userId: number, direction: SwipeDirection) {
     fetch(`/api/matches/${userId}/interaction`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: direction === "right" ? "like" : "pass" }),
-    });
+    }).catch(() => {});
 
-    // Move to next match
-    if (direction === "right" && Math.random() > 0.3) {
-      // Show confetti for matches
-      showConfetti();
-    }
-
-    setCurrentIndex(currentIndex + 1);
-  };
-
-  const showConfetti = () => {
-    const confetti = document.createElement("div");
-    confetti.textContent = "✨";
-    confetti.style.position = "fixed";
-    confetti.style.left = Math.random() * window.innerWidth + "px";
-    confetti.style.top = "50%";
-    confetti.style.fontSize = "2rem";
-    confetti.style.pointerEvents = "none";
-    document.body.appendChild(confetti);
-
-    // Animate
-    let y = window.innerHeight / 2;
-    const animate = () => {
-      y -= 3;
-      confetti.style.top = y + "px";
-      if (y > -50) requestAnimationFrame(animate);
-      else document.body.removeChild(confetti);
-    };
-    animate();
-  };
+    setCurrentIndex((current) => current + 1);
+  }
 
   const current = displayMatches[currentIndex];
-
   if (!current) {
     return (
-      <div className="flex flex-col items-center justify-center h-96">
-        <p className="text-2xl font-bold mb-2">No more matches 👀</p>
-        <p className="text-gray-400 mb-6">Check back tomorrow for more!</p>
+      <div className="flex h-96 flex-col items-center justify-center">
+        <p className="mb-2 text-2xl font-bold">No more matches 👀</p>
+        <p className="mb-6 text-gray-400">Check back tomorrow for more.</p>
         <button className="btn-primary">Browse All Users</button>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full h-full max-w-sm mx-auto">
+    <div className="relative mx-auto h-full w-full max-w-sm">
       <MatchCard user={current} onSwipe={handleSwipe} />
       <div className="mt-4 text-center text-sm text-gray-400">
         {currentIndex + 1} / {displayMatches.length}
       </div>
     </div>
   );
-};
+}
 
 export default MatchesSwipe;

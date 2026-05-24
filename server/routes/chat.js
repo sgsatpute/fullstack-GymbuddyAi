@@ -4,6 +4,7 @@ import auth from "../middleware/auth.js";
 import { awardEligibleBadges } from "../utils/badges.js";
 import { logActivity } from "../utils/activity.js";
 import { getBlockedUserIds, isBlockedBetweenUsers } from "../utils/relationships.js";
+import { awardXP, XP_REWARDS } from "../utils/xpSystem.js";
 
 const router = express.Router();
 
@@ -174,9 +175,9 @@ router.get("/:userId", auth, (req, res) => {
 
   db.prepare(`
     UPDATE messages
-    SET seen = 1
+    SET seen = 1, seenAt = ?
     WHERE receiverId = ? AND senderId = ?
-  `).run(me, other);
+  `).run(new Date().toISOString(), me, other);
 
   const messages = db.prepare(`
     SELECT id, senderId, receiverId, message, seen, createdAt
@@ -223,21 +224,7 @@ router.post("/:userId", auth, (req, res) => {
       VALUES (?, ?, ?)
     `).run(senderId, receiverId, cleanMessage);
 
-    const currentUser = db.prepare(`
-      SELECT xp, level
-      FROM users
-      WHERE id = ?
-    `).get(senderId);
-
-    const newXp = (currentUser?.xp ?? 0) + 1;
-    const newLevel = Math.floor(newXp / 100) + 1;
-
-    db.prepare(`
-      UPDATE users
-      SET xp = ?,
-          level = ?
-      WHERE id = ?
-    `).run(newXp, newLevel, senderId);
+    const xpAward = awardXP(senderId, XP_REWARDS.message_sent, "message_sent");
 
     db.prepare(`
       INSERT INTO match_feedback (userA, userB, label)
@@ -249,6 +236,7 @@ router.post("/:userId", auth, (req, res) => {
 
     res.json({
       ok: true,
+      xpGained: xpAward.xpGained,
       newlyEarnedBadges,
     });
   } catch {

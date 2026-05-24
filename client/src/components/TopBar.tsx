@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Bot, ChevronDown, LayoutDashboard, LogOut, Medal, User as UserIcon, Users, UtensilsCrossed } from "lucide-react";
+import { Activity, Bot, ChevronDown, LayoutDashboard, LogOut, Medal, User as UserIcon, Users, UtensilsCrossed } from "lucide-react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import Avatar from "./Avatar";
+import NotificationCenter from "./ui/NotificationCenter";
 import { logoutSession, hasStoredToken } from "../utils/auth";
 import { apiFetch } from "../utils/api";
 import { UserProfile } from "../utils/models";
@@ -52,6 +53,9 @@ export default function TopBar() {
         <NavLink to="/coach" className={({ isActive }) => `btn-ghost ${isActive ? "text-accent border-accent" : ""}`}>
           Coach
         </NavLink>
+        <NavLink to="/groups" className={({ isActive }) => `btn-ghost ${isActive ? "text-accent border-accent" : ""}`}>
+          Groups
+        </NavLink>
         <NavLink to="/nutrition" className={({ isActive }) => `btn-ghost ${isActive ? "text-accent border-accent" : ""}`}>
           Nutrition
         </NavLink>
@@ -60,6 +64,8 @@ export default function TopBar() {
         </NavLink>
       </nav>
 
+      <div className="flex items-center gap-3">
+        <NotificationCenter />
       <details className="relative">
         <summary className="list-none">
           <button className="btn-ghost flex items-center gap-3">
@@ -86,6 +92,10 @@ export default function TopBar() {
             <UtensilsCrossed size={16} />
             Nutrition
           </Link>
+          <Link to="/body-progress" className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white hover:bg-white/5">
+            <Activity size={16} />
+            Body Progress
+          </Link>
           <Link to="/leaderboard" className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white hover:bg-white/5">
             <Medal size={16} />
             Leaderboard
@@ -96,6 +106,7 @@ export default function TopBar() {
           </button>
         </div>
       </details>
+      </div>
     </header>
   );
 }

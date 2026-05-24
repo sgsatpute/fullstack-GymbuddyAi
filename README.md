@@ -1,224 +1,174 @@
-# 🎯 GymBuddy AI
+# GymBuddy AI
 
-An AI-powered social fitness matchmaking and real-time coaching platform designed to connect gym partners, track workouts and nutrition, and offer smart recommendations.
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Online-22c55e?style=for-the-badge)](https://fullstack-gymbuddyai-production.up.railway.app)
+[![Railway](https://img.shields.io/badge/Railway-Backend-0f172a?style=for-the-badge&logo=railway)](https://railway.app/)
+[![Vercel](https://img.shields.io/badge/Vercel-Frontend-000000?style=for-the-badge&logo=vercel)](https://vercel.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![CI](https://img.shields.io/badge/CI-GitHub_Actions-2563eb?style=for-the-badge&logo=githubactions&logoColor=white)](./.github/workflows/ci.yml)
 
----
+GymBuddy AI is a social fitness platform that matches gym-goers with compatible workout partners.
+Unlike solo tracking apps, GymBuddy focuses on motivation through community and consistency loops.
+The platform combines real-time chat, small-group challenges, AI coaching, nutrition support, and compatibility scoring.
+It is designed as a premium fitness product with a strong social edge that standalone trackers usually miss.
 
-## 🚀 Live Demo & Status
+## Features
 
-* **Frontend App**: [https://fullstack-gymbuddy-ai.vercel.app](https://fullstack-gymbuddy-ai.vercel.app)
-* **Backend API**: [https://fullstack-gymbuddy-ai-production.up.railway.app](https://fullstack-gymbuddy-ai-production.up.railway.app)
-* **API Documentation**: [https://fullstack-gymbuddy-ai-production.up.railway.app/api-docs](https://fullstack-gymbuddy-ai-production.up.railway.app/api-docs)
+- 🤝 Smart compatibility matching with weighted goal, schedule, age, experience, and activity scoring
+- 💬 Real-time one-to-one chat with typing indicators, presence, and read receipts
+- 🧠 Anthropic-powered coach with context memory, history, daily check-ins, and SSE streaming support
+- 🏋️ Workout logging with XP rewards, streak progression, and partner activity notifications
+- 🍛 AI nutrition analysis with Indian food shortcuts and OpenFoodFacts search
+- 📈 Body progress tracking with 90-day charts and AI-generated summaries
+- 🏆 XP, levels, badges, streak freezes, and gamified leaderboard progression
+- 👥 Invite-code gym groups with shared feeds and group challenges
+- 🥗 Structured meal plans and weekly nutrition insights
+- 📍 Location-aware matching using city and training-location metadata
+- 🛡️ JWT auth, refresh tokens, bcrypt password hashing, and rate-limited AI routes
+- 🖼️ Avatar upload and media-backed nutrition image analysis
+- 🔔 In-app notifications for badges, levels, partner activity, and group events
+- 📦 Docker, Compose, health checks, and CI/CD workflow scaffolding
+- 📊 Shared Drizzle schema mirror plus SQLite runtime bootstrap for fast local setup
 
-[![Build Status](https://github.com/sgsatpute/fullstack-GymbuddyAi/actions/workflows/ci.yml/badge.svg)](https://github.com/sgsatpute/fullstack-GymbuddyAi/actions/workflows/ci.yml)
-[![Vercel Deployment](https://img.shields.io/badge/Deployed_on-Vercel-black?logo=vercel&logoColor=white)](https://fullstack-gymbuddy-ai.vercel.app)
-[![Railway Deployment](https://img.shields.io/badge/Deployed_on-Railway-0B0D19?logo=railway&logoColor=white)](https://fullstack-gymbuddy-ai-production.up.railway.app)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+## Tech Stack
 
----
+| Area | Stack |
+| --- | --- |
+| Frontend | React 18, TypeScript, Tailwind CSS, framer-motion, TanStack Query, Recharts, Socket.io client |
+| Backend | Node.js 20, Express 4, ES Modules, JWT, bcryptjs, Socket.io 4, Nodemailer, express-rate-limit |
+| AI + ML | Anthropic Claude, Python, scikit-learn, pandas, numpy, joblib |
+| Data | SQLite runtime bootstrap, Drizzle schema mirror, PostgreSQL-ready Docker/compose config |
+| DevOps | Vite, esbuild, Docker, GitHub Actions, Railway, Vercel, Husky |
 
-## 🛠️ Tech Stack
+## Screenshots
 
-### Frontend
-![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
-![TanStack Query](https://img.shields.io/badge/TanStack_Query-FF4154?style=for-the-badge&logo=react-query&logoColor=white)
-![Framer Motion](https://img.shields.io/badge/Framer_Motion-0055FF?style=for-the-badge&logo=framer&logoColor=white)
+| Dashboard | Matches | Coach |
+| --- | --- | --- |
+| `docs/screenshots/dashboard.png` | `docs/screenshots/matches.png` | `docs/screenshots/coach.png` |
 
-### Backend & Database
-![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
-![Express](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
-![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-C5F74F?style=for-the-badge&logo=drizzle&logoColor=black)
-![Socket.io](https://img.shields.io/badge/Socket.io-010101?style=for-the-badge&logo=socket.io&logoColor=white)
+| Nutrition | Groups | Body Progress |
+| --- | --- | --- |
+| `docs/screenshots/nutrition.png` | `docs/screenshots/groups.png` | `docs/screenshots/body-progress.png` |
 
-### AI / Machine Learning
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white)
+## Local Setup
 
----
-
-## ✨ Features
-
-- 🔐 **Secure Authentication**: JWT-based auth with access and refresh tokens, plus password reset using email-based OTPs.
-- 🤝 **Gym Partner Matchmaking**: Intelligent geolocation-based and preference-based pairing of workout partners.
-- 💬 **Real-Time Interactive Chat**: Instant messaging, online status indicators, typing animations, and emoji reactions using Socket.io.
-- 🤖 **AI Workout & Nutrition Coach**: Customized workout plans generated via a trained Random Forest model.
-- 🏆 **Gamification & Leaderboard**: Level-up system (XP) with streak tracking and badge rewards to boost user engagement.
-- 📊 **Comprehensive Dashboard**: Track daily calorie intake, active workout sessions, and weight progress with Recharts.
-- 📧 **Email Notifications**: Integrated email engine for OTPs and match alerts.
-- 📁 **Profile & Food Image Uploads**: Local file storage for customized user profiles.
-- 🛡️ **Security Safeguards**: Rate-limiting limits on authentication routes, password salting, and safety blocks.
-
----
-
-## 📸 Screenshots
-
-*Include snapshots of key pages:*
-
-### Dashboard Overview
-`[Screenshot here]`
-
-### Matchmaking & Real-Time Chat
-`[Screenshot here]`
-
----
-
-## ⚙️ Environment Variables
-
-Copy `.env.example` to `.env` and fill in the values:
-
-| Variable | Description | Default Value |
-|----------|-------------|---------------|
-| `NODE_ENV` | App mode (`development` or `production`) | `development` |
-| `PORT` | Backend server port | `5001` |
-| `JWT_SECRET` | Secret key used for signing JWTs | `replace-with-a-long-random-secret` |
-| `DB_PATH` | Local database path | `server/gymbuddy.db` |
-| `ACCESS_TOKEN_TTL` | Lifespan of the JWT Access Token | `15m` |
-| `REFRESH_TOKEN_DAYS`| Validity of Refresh Token in days | `7` |
-| `SMTP_HOST` | Host address of the SMTP server for emails | (Optional) |
-| `SMTP_PORT` | Port of the SMTP server | `587` |
-| `SMTP_SECURE` | Use SSL/TLS for SMTP connection | `false` |
-| `SMTP_USER` | Email username for SMTP login | (Optional) |
-| `SMTP_PASS` | Email password for SMTP login | (Optional) |
-| `ANTHROPIC_API_KEY` | Optional key to power premium coach features | (Optional) |
-| `GOOGLE_MAPS_API_KEY`| API key to enable Maps geolocation lookup | (Optional) |
-
----
-
-## 📂 Project Structure
-
-```
-.
-├── client/                     # Frontend (React + TypeScript)
-│   ├── src/
-│   │   ├── components/         # UI components
-│   │   ├── hooks/              # Custom hooks (e.g. useWebRTC)
-│   │   ├── utils/              # API and Socket helpers
-│   │   └── App.tsx             # Main React entry point
-│   ├── index.html
-│   └── vite.config.ts          # Vite configuration
-├── server/                     # Backend (Node.js + Express)
-│   ├── index.js                # Server entry point
-│   ├── db.js                   # SQLite database connection and schemas
-│   ├── config.js               # Server environment config
-│   ├── middleware/             # Auth, rate-limiter, error handler
-│   ├── routes/                 # Express API endpoints
-│   ├── utils/                  # Winston logger, AppError, etc.
-│   └── ml/                     # Python scripts and trained .pkl files
-├── shared/                     # Shared Types and Schemas
-├── vercel.json                 # Vercel deployment configuration
-├── package.json                # Project dependencies
-└── README.md
+```bash
+git clone https://github.com/sgsatpute/fullstack-GymbuddyAi.git
+cd fullstack-GymbuddyAi
+cp .env.example .env
+npm install
+npm run db:push
+npm run dev
 ```
 
----
+The app will start on `http://localhost:5001` for the backend and serve the Vite client through the existing build/dev flow.
 
-## 🛠️ Local Setup Instructions
+## Docker Quick Start
 
-### Prerequisites
-- Node.js (v18+)
-- Python (v3.9+)
+```bash
+docker-compose up --build
+```
 
-### Step-by-Step Installation
+## Environment Variables
 
-1. **Clone Repository**:
-   ```bash
-   git clone https://github.com/sgsatpute/fullstack-GymbuddyAi.git
-   cd fullstack-GymbuddyAi
-   ```
+| Variable | Purpose |
+| --- | --- |
+| `JWT_SECRET` | Signs and verifies access tokens |
+| `PORT` | Backend port, defaults to `5001` |
+| `DB_PATH` | SQLite database location for local runtime |
+| `DATABASE_URL` | PostgreSQL connection string for future/hosted environments |
+| `ACCESS_TOKEN_TTL` | Access token expiration window |
+| `REFRESH_TOKEN_DAYS` | Refresh token lifetime |
+| `RATE_LIMIT_WINDOW_MS` | Shared API limiter window |
+| `RATE_LIMIT_MAX_REQUESTS` | Shared API limiter ceiling |
+| `AUTH_RATE_LIMIT_MAX_REQUESTS` | Auth-specific brute-force protection |
+| `PASSWORD_RESET_RATE_LIMIT_MAX_REQUESTS` | Password reset limiter |
+| `ANTHROPIC_API_KEY` | Claude API access for coach and nutrition AI routes |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | Email delivery configuration |
+| `SMTP_FROM` | Outbound sender label |
+| `GOOGLE_MAPS_API_KEY` | Optional geocoding for location-aware matching |
+| `GOOGLE_MAPS_REGION` | Regional bias for geocoding lookups |
 
-2. **Install Root and Project Dependencies**:
-   ```bash
-   npm install
-   ```
+## Project Structure
 
-3. **Configure Environment variables**:
-   Create a `.env` file in the root directory by copying the example:
-   ```bash
-   cp .env.example .env
-   ```
-   *(Update your secrets and keys inside `.env`)*
+```text
+client/
+  public/
+  src/
+server/
+  middleware/
+  ml/
+  routes/
+  uploads/
+  utils/
+shared/
+  schema.ts
+script/
+  build.ts
+.github/
+  workflows/
+```
 
-4. **Train the ML model**:
-   ```bash
-   cd server/ml
-   pip install -r requirements.txt
-   python train_model.py
-   cd ../..
-   ```
+## API Endpoints
 
-5. **Start Local Development Server**:
-   ```bash
-   npm run dev
-   ```
-   - Frontend is available at: [http://localhost:5173](http://localhost:5173)
-   - Backend API is available at: [http://localhost:5001](http://localhost:5001)
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/users/me` | Load the signed-in user profile, stats, badges, and XP progress |
+| `POST` | `/api/users/profile` | Complete or update the profile used for matching |
+| `GET` | `/api/matches` | Return ranked compatibility matches |
+| `GET` | `/api/matches/compatibility/:userId` | Detailed compatibility breakdown for a specific user |
+| `GET` | `/api/chat/:userId` | Load a direct conversation |
+| `POST` | `/api/chat/:userId` | Send a direct message |
+| `POST` | `/api/coach/message` | Send a coach message, optionally as SSE streaming |
+| `POST` | `/api/coach/workout-plan` | Generate and persist a personalized workout plan |
+| `POST` | `/api/nutrition/analyze-text` | Analyze a natural-language meal description |
+| `GET` | `/api/nutrition/search?q=` | Search Indian staples first, then OpenFoodFacts |
+| `GET` | `/api/gamification/profile` | XP, levels, streak status, and earned badges |
+| `POST` | `/api/groups/create` | Create a small gym group with invite code |
 
----
+## AI Features
 
-## 📡 API Endpoints
+### Anthropic Claude
 
-All protected endpoints require a JWT token in the `Authorization: Bearer <token>` header or HttpOnly Cookie.
+- Coach messaging can stream chunks over Server-Sent Events.
+- User context includes profile data, recent workouts, streaks, and leaderboard position.
+- Daily check-ins and progress summaries use graceful AI fallbacks if the API is unavailable.
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| `POST` | `/api/auth/register` | Register a new user | No |
-| `POST` | `/api/auth/login` | Log in and retrieve JWT tokens | No |
-| `POST` | `/api/auth/logout` | Revoke active session / refresh token | Yes |
-| `GET`  | `/api/profile` | Get the profile of the current user | Yes |
-| `PUT`  | `/api/profile` | Update the current user profile data | Yes |
-| `GET`  | `/api/leaderboard` | Retrieve top 10 users by XP | Yes |
-| `GET`  | `/api/matches` | Get current user's matching partners | Yes |
-| `POST` | `/api/matches/find` | Find or generate a workout partner match | Yes |
-| `GET`  | `/api/chat/messages/:userId` | Get messaging history with a partner | Yes |
-| `POST` | `/api/chat/messages` | Send a new direct message | Yes |
-| `GET`  | `/api/health` | Service health status check | No |
+### Python Workout Model
 
----
+- `server/ml/train_coach.py` generates 1,000 realistic samples and trains a `RandomForestClassifier`.
+- The model uses a `ColumnTransformer` with `StandardScaler` and `OneHotEncoder`.
+- Prediction output is structured JSON with confidence, alternatives, schedule, and reasoning.
 
-## 📊 Database Schema Overview
+### AI Nutrition
 
-We use **SQLite** (local development) and **PostgreSQL** (production deployment).
+- Natural-language meal analysis returns structured macros and coaching suggestions.
+- Weekly pattern analysis highlights likely deficiencies and practical next steps.
+- Meal-plan generation can target the user’s preferred calories and training style.
 
-- **`users`**: Core user accounts including profiles, streaks, experience level (XP), and location details.
-- **`messages` / `message_reactions`**: Private chat logs and emoji reaction relationships.
-- **`match_feedback`**: Feeds labels (like/dislike) to enhance matching models.
-- **`checkins`**: Daily check-in timestamps, keeping track of activity streaks.
-- **`workout_sessions`**: Session history logs (type, focus area, duration, intensity, notes).
-- **`meal_entries`**: Daily food tracking with macro ratios (protein, carbs, fat, fiber).
-- **`badges`**: Game achievements unlocked by users.
-- **`blocks`**: Security list keeping track of blocks or reports against other users.
-- **`refresh_tokens` / `password_reset_otps`**: Security models managing tokens and reset requests.
+### MCP / Tooling Ready
 
----
+- Shared schema and Docker setup keep the app ready for future automation and richer deployment pipelines.
 
-## 🚀 Deployment Instructions
+## GymBuddy vs SparkyFitness
 
-### Frontend (Vercel)
-1. Import the repository into Vercel.
-2. In Project Settings, set Build command as `npm run build` and Output Directory as `dist/public`.
-3. Set environment variable: `VITE_API_URL` to your production backend URL.
-4. Deploy!
+| Capability | GymBuddy AI | SparkyFitness-style Solo Tracker |
+| --- | --- | --- |
+| Compatibility-based partner discovery | ✅ Core differentiator | ⚪ Usually absent |
+| Real-time social chat | ✅ Built in | ⚪ Rare |
+| Small private fitness groups | ✅ Invite-code squads | ⚪ Usually absent |
+| AI coach with user memory | ✅ Context-aware | ⚪ Often generic |
+| Indian food shortcuts + AI nutrition | ✅ Included | ⚪ Often western-food biased |
+| XP, badges, streaks, and leaderboard loops | ✅ Full social gamification | ⚪ Often limited |
 
-### Backend & Database (Railway)
-1. Create a new project on Railway.
-2. Provision a **PostgreSQL** database service and connect a backend Node service linking to your GitHub repository.
-3. Configure the environment variables in Railway (e.g. `JWT_SECRET`, `SMTP_USER`, `DATABASE_URL` for PostgreSQL connection).
-4. Railway will automatically build and deploy the backend.
+## What I Would Add Next
 
----
+1. Push notifications for streak reminders and partner activity outside the app.
+2. Real Postgres-backed Drizzle runtime instead of the current SQLite-first bootstrap.
+3. Group challenge progress visualizations and challenge-specific badges.
+4. Coach-generated deload weeks and long-term periodization planning.
+5. Image-rich screenshot documentation and seeded demo data for onboarding.
 
-## 🔮 Future Improvements
+## Author
 
-1. **Interactive WebRTC Video Calls**: Implement real-time video coaching between partners.
-2. **Push Notifications**: Enable mobile web-push alerts for new partner matches.
-3. **Advanced Diet Recognition**: Scan food items directly from uploaded images using computer vision.
-
----
-
-## 📄 License
-
-Distributed under the MIT License. See `LICENSE` for more details.
+Built by Saurav Satpute.

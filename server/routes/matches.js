@@ -1,58 +1,64 @@
 import express from "express";
 import db from "../db.js";
 import auth from "../middleware/auth.js";
-import { getBlockedUserIds } from "../utils/relationships.js";
 import { requestAnthropicText } from "../utils/anthropic.js";
 import { buildMapsDirectionsLink, calculateDistanceKm } from "../utils/location.js";
+import { getBlockedUserIds } from "../utils/relationships.js";
 import {
-  rankMatches,
   getMatchBreakdown,
   logMatchInteraction,
+  rankMatches,
 } from "../utils/smartMatch.js";
 
 const router = express.Router();
 
-function normalize(value) {
-  return String(value ?? "").trim().toLowerCase();
+function mapMatchForResponse(currentUser, match) {
+  const distanceKm = calculateDistanceKm(
+    {
+      locationLat: currentUser.locationLat,
+      locationLng: currentUser.locationLng,
+    },
+    {
+      locationLat: match.locationLat,
+      locationLng: match.locationLng,
+    }
+  );
+
+  return {
+    user: match,
+    score: match.compatibility,
+    matchLabel: match.matchLabel,
+    compatibilityReasons: match.compatibilityReasons,
+    breakdown: match.breakdown,
+    canChat: match.canChat,
+    distanceKm,
+    locationInsight: match.locationLabel || match.city || "",
+    mapsUrl: buildMapsDirectionsLink({
+      locationLabel: match.locationLabel,
+      city: match.city,
+    }),
+  };
 }
 
 router.get("/", auth, (req, res) => {
-  const userId = req.user.id;
+  const ranking = rankMatches(req.user.id, 20);
 
-  // Use smart matching engine
-  const result = rankMatches(userId, 50);
-
-  if (result.error) {
-    return res.status(result.error === "PROFILE_INCOMPLETE" ? 400 : 404).json({
-      error: result.error,
+  if (ranking.error) {
+    const statusCode = ranking.error === "PROFILE_INCOMPLETE" ? 400 : 404;
+    return res.status(statusCode).json({
+      error: ranking.error,
+      missingFields: ranking.missingFields ?? [],
     });
   }
 
-  // Enhance matches with location insights and additional data
-  const enhancedMatches = result.matches.map((match) => {
-    const distanceKm = calculateDistanceKm(
-      { locationLat: req.user.locationLat, locationLng: req.user.locationLng },
-      { locationLat: match.locationLat, locationLng: match.locationLng }
-    );
+  const currentUser = db.prepare(`
+    SELECT id, locationLat, locationLng
+    FROM users
+    WHERE id = ?
+  `).get(req.user.id);
 
-    const mapsUrl = buildMapsDirectionsLink({
-      locationLabel: match.locationLabel,
-      city: match.city,
-    });
-
-    return {
-      user: match,
-      score: match.compatibility,
-      tier: match.tier,
-      canChat: match.canChat,
-      reasons: match.tier === "Elite match" ? ["Perfect compatibility"] : [],
-      distanceKm,
-      locationInsight: match.locationLabel || match.city || "",
-      mapsUrl,
-    };
-  });
-
-  res.json(enhancedMatches);
+  const payload = ranking.matches.map((match) => mapMatchForResponse(currentUser, match));
+  res.json(payload);
 });
 
 router.post("/:id/intro", auth, async (req, res) => {
@@ -64,19 +70,18 @@ router.post("/:id/intro", auth, async (req, res) => {
       return res.status(400).json({ error: "Invalid user id" });
     }
 
-    const blockedUserIds = getBlockedUserIds(myId);
-    if (blockedUserIds.includes(otherId)) {
+    if (getBlockedUserIds(myId).includes(otherId)) {
       return res.status(403).json({ error: "This user is unavailable." });
     }
 
     const me = db.prepare(`
-      SELECT id, name, age, gym, city, goal, experience, preferredTime, streak, consistency, xp, level, bio, avatarUrl, locationLabel, locationLat, locationLng
+      SELECT id, name, goal, experience, preferredTime
       FROM users
       WHERE id = ?
     `).get(myId);
 
     const other = db.prepare(`
-      SELECT id, name, age, gym, city, goal, experience, preferredTime, streak, consistency, xp, level, bio, avatarUrl, locationLabel, locationLat, locationLng
+      SELECT id, name
       FROM users
       WHERE id = ?
     `).get(otherId);
@@ -86,16 +91,21 @@ router.post("/:id/intro", auth, async (req, res) => {
     }
 
     const breakdown = getMatchBreakdown(myId, otherId);
-    const fallbackText = `Hey ${other.name}, looks like we both ${String(breakdown?.reasons?.[0] ?? "train on a similar schedule").toLowerCase()}. Want to team up for a session sometime?`;
+    const headline =
+      breakdown?.compatibilityReasons?.[0] ??
+      breakdown?.reasons?.[0] ??
+      "train on a similar schedule";
+    const fallbackText = `Hey ${other.name}, looks like we both ${String(headline).toLowerCase()}. Want to get a session in this week?`;
+
     const message = await requestAnthropicText({
-      system: "Write short, casual, friendly gym buddy intro messages. One sentence only. No emojis.",
+      system: "Write one short, casual gym buddy intro message. No emojis. Keep it warm and natural.",
       messages: [
         {
           role: "user",
-          content: `Write intro from ${me.name} to ${other.name}. They both ${breakdown?.reasons?.[0] ?? "have similar training goals"}, train ${me.preferredTime}, goal: ${me.goal}.`,
+          content: `Write an intro from ${me.name} to ${other.name}. Match reason: ${headline}. Goal: ${me.goal}. Preferred time: ${me.preferredTime}.`,
         },
       ],
-      maxTokens: 80,
+      maxTokens: 90,
       fallbackText,
     });
 
@@ -105,32 +115,33 @@ router.post("/:id/intro", auth, async (req, res) => {
   }
 });
 
-router.get("/:id/compatibility", auth, (req, res) => {
+function handleCompatibilityRequest(req, res) {
   try {
-    const myId = req.user.id;
-    const otherId = Number(req.params.id);
+    const otherId = Number(req.params.userId ?? req.params.id);
 
     if (!Number.isInteger(otherId)) {
       return res.status(400).json({ error: "Invalid user id" });
     }
 
-    const breakdown = getMatchBreakdown(myId, otherId);
+    const breakdown = getMatchBreakdown(req.user.id, otherId);
     if (!breakdown) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    logMatchInteraction(myId, otherId, "view");
-    res.json(breakdown);
+    logMatchInteraction(req.user.id, otherId, "view");
+    return res.json(breakdown);
   } catch {
-    res.status(500).json({ error: "Failed to get compatibility" });
+    return res.status(500).json({ error: "Failed to get compatibility" });
   }
-});
+}
+
+router.get("/compatibility/:userId", auth, handleCompatibilityRequest);
+router.get("/:id/compatibility", auth, handleCompatibilityRequest);
 
 router.post("/:id/interaction", auth, (req, res) => {
   try {
-    const myId = req.user.id;
     const otherId = Number(req.params.id);
-    const { action } = req.body;
+    const action = String(req.body?.action ?? "").trim();
 
     if (!Number.isInteger(otherId)) {
       return res.status(400).json({ error: "Invalid user id" });
@@ -140,7 +151,7 @@ router.post("/:id/interaction", auth, (req, res) => {
       return res.status(400).json({ error: "Invalid action" });
     }
 
-    logMatchInteraction(myId, otherId, action);
+    logMatchInteraction(req.user.id, otherId, action);
     res.json({ success: true, action, timestamp: new Date().toISOString() });
   } catch {
     res.status(500).json({ error: "Failed to log interaction" });

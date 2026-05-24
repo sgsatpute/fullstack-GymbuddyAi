@@ -1,7 +1,7 @@
 import express from "express";
 import db from "../db.js";
 import auth from "../middleware/auth.js";
-import { awardEligibleBadges, BADGE_METADATA, getUserBadges } from "../utils/badges.js";
+import { awardEligibleBadges, getBadgeStatusList, getUserBadges } from "../utils/badges.js";
 import { getLevelProgress } from "../utils/gamification.js";
 import { buildTrainingLocationQuery, geocodeTrainingLocation } from "../utils/location.js";
 
@@ -73,7 +73,7 @@ router.get("/me", auth, (req, res) => {
       checkinCount: getCheckinCount(user.id),
       matchCount: getMatchCount(user.id),
       levelProgress: getLevelProgress(user.xp ?? 0),
-      availableBadges: Object.values(BADGE_METADATA),
+      availableBadges: getBadgeStatusList(user.id),
     });
   } catch {
     return res.status(500).json({ error: "Failed to load profile" });

@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+
+STAGED_TS_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx)$')
+
+if [ -z "$STAGED_TS_FILES" ]; then
+  exit 0
+fi
+
+echo "Running TypeScript check for staged changes..."
+npm run check

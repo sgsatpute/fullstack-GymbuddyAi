@@ -1,413 +1,424 @@
-/**
- * Smart Matchmaking Engine
- * 
- * Compatibility scoring based on 5 weighted factors:
- * - Goal compatibility (40%)
- * - Experience level (25%)
- * - Schedule alignment (20%)
- * - Age proximity (10%)
- * - Activity level (5%)
- * 
- * This provides more sophisticated matching than basic filtering.
- */
-
 import db from "../db.js";
+import { getBlockedUserIds as getRelationshipBlockedUserIds } from "./relationships.js";
+import { getUserActivityScore } from "./activityTracker.js";
 
-const WEIGHTS = {
-  goal: 0.40,
+export const WEIGHTS = {
+  goal: 0.4,
   experience: 0.25,
-  schedule: 0.20,
-  age: 0.10,
+  schedule: 0.2,
+  age: 0.1,
   activity: 0.05,
 };
 
-/**
- * Calculates goal compatibility score (0-100)
- * Exact match: 100
- * No match: 0
- */
+const EXPERIENCE_LEVELS = ["beginner", "intermediate", "advanced"];
+const SCHEDULE_LEVELS = ["morning", "afternoon", "evening", "night"];
+
+function normalizeGoal(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  const aliases = {
+    bulking: "muscle",
+    gain: "muscle",
+    muscle_gain: "muscle",
+    fat_loss: "weight_loss",
+    cutting: "weight_loss",
+    cardio: "endurance",
+    mobility: "flexibility",
+    yoga: "flexibility",
+    health: "fitness",
+    general: "fitness",
+  };
+
+  return aliases[raw] ?? raw;
+}
+
+function normalizeExperience(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function normalizeSchedule(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
 function calculateGoalCompatibility(goal1, goal2) {
-  const normalize = (g) => String(g ?? "").trim().toLowerCase();
-  const g1 = normalize(goal1);
-  const g2 = normalize(goal2);
+  const g1 = normalizeGoal(goal1);
+  const g2 = normalizeGoal(goal2);
 
-  if (!g1 || !g2) return 0;
-  if (g1 === g2) return 100;
-
-  // Related goals get partial credit
-  const goalGroups = [
-    ["muscle", "bulking", "gain"],
-    ["weight_loss", "fat_loss", "cutting"],
-    ["endurance", "cardio"],
-    ["flexibility", "mobility", "yoga"],
-    ["general", "fitness", "health"],
-  ];
-
-  for (const group of goalGroups) {
-    const g1InGroup = group.includes(g1);
-    const g2InGroup = group.includes(g2);
-    if (g1InGroup && g2InGroup) return 60;
+  if (!g1 || !g2) {
+    return 0;
   }
 
-  return 0;
+  if (g1 === g2) {
+    return 100;
+  }
+
+  if (g1 === "flexibility" || g2 === "flexibility") {
+    return 40;
+  }
+
+  const matrix = {
+    "endurance|muscle": 60,
+    "endurance|weight_loss": 80,
+    "muscle|weight_loss": 50,
+  };
+
+  return matrix[[g1, g2].sort().join("|")] ?? 45;
 }
 
-/**
- * Calculates experience compatibility score (0-100)
- * Exact match: 100
- * Adjacent level: 70
- * Different level: 20
- */
 function calculateExperienceCompatibility(exp1, exp2) {
-  const normalize = (e) => String(e ?? "").trim().toLowerCase();
-  const e1 = normalize(exp1);
-  const e2 = normalize(exp2);
+  const left = EXPERIENCE_LEVELS.indexOf(normalizeExperience(exp1));
+  const right = EXPERIENCE_LEVELS.indexOf(normalizeExperience(exp2));
 
-  if (!e1 || !e2) return 0;
-  if (e1 === e2) return 100;
+  if (left === -1 || right === -1) {
+    return 0;
+  }
 
-  const levels = ["beginner", "intermediate", "advanced"];
-  const idx1 = levels.indexOf(e1);
-  const idx2 = levels.indexOf(e2);
-
-  if (idx1 === -1 || idx2 === -1) return 0;
-
-  const diff = Math.abs(idx1 - idx2);
-  if (diff === 1) return 70; // Adjacent levels (e.g., beginner → intermediate)
-  return 20; // Non-adjacent (e.g., beginner → advanced)
+  const difference = Math.abs(left - right);
+  if (difference === 0) {
+    return 100;
+  }
+  if (difference === 1) {
+    return 70;
+  }
+  return 30;
 }
 
-/**
- * Calculates schedule alignment score (0-100)
- * Exact match: 100
- * Overlapping times: 70
- * No overlap: 20
- */
 function calculateScheduleCompatibility(time1, time2) {
-  const normalize = (t) => String(t ?? "").trim().toLowerCase();
-  const t1 = normalize(time1);
-  const t2 = normalize(time2);
+  const left = normalizeSchedule(time1);
+  const right = normalizeSchedule(time2);
 
-  if (!t1 || !t2) return 0;
-  if (t1 === t2) return 100;
+  if (!left || !right) {
+    return 0;
+  }
 
-  // Define time overlap rules
-  const overlaps = {
-    morning: ["morning", "afternoon", "flexible"],
-    afternoon: ["morning", "afternoon", "flexible"],
-    evening: ["evening", "night", "flexible"],
-    night: ["evening", "night", "flexible"],
-    flexible: ["morning", "afternoon", "evening", "night", "flexible"],
-  };
+  if (left === right) {
+    return 100;
+  }
 
-  const schedule1Overlaps = overlaps[t1] || [];
-  if (schedule1Overlaps.includes(t2)) return 70;
+  if (left === "flexible" || right === "flexible") {
+    return 40;
+  }
 
-  return 20;
+  const leftIndex = SCHEDULE_LEVELS.indexOf(left);
+  const rightIndex = SCHEDULE_LEVELS.indexOf(right);
+  if (leftIndex === -1 || rightIndex === -1) {
+    return 0;
+  }
+
+  return Math.abs(leftIndex - rightIndex) === 1 ? 40 : 0;
 }
 
-/**
- * Calculates age proximity score (0-100)
- * Same year: 100
- * Within 3 years: 80
- * Within 6 years: 50
- * Within 10 years: 20
- * >10 years: 0
- */
 function calculateAgeCompatibility(age1, age2) {
-  if (!Number.isFinite(age1) || !Number.isFinite(age2)) return 0;
+  if (!Number.isFinite(Number(age1)) || !Number.isFinite(Number(age2))) {
+    return 0;
+  }
 
-  const gap = Math.abs(age1 - age2);
-  if (gap === 0) return 100;
-  if (gap <= 3) return 80;
-  if (gap <= 6) return 50;
-  if (gap <= 10) return 20;
-  return 0;
+  const difference = Math.abs(Number(age1) - Number(age2));
+  if (difference <= 3) {
+    return 100;
+  }
+  if (difference <= 5) {
+    return 80;
+  }
+  if (difference <= 10) {
+    return 60;
+  }
+  return 30;
 }
 
-/**
- * Calculates activity level compatibility (0-100)
- * Based on streak, consistency, and XP level
- * 
- * Determines if users have similar dedication levels
- */
-function calculateActivityCompatibility(user1, user2) {
-  const getActivityLevel = (user) => {
-    const streak = user.streak ?? 0;
-    const xp = user.xp ?? 0;
-    const consistency = user.consistency ?? 0;
+function ensureActivitySnapshot(user) {
+  if (!user?.id) {
+    return {
+      ...user,
+      activitySnapshot: { activeLast7Days: false, score: 0 },
+    };
+  }
 
-    const streakScore = Math.min(streak / 30, 1) * 40; // Max 40 points
-    const xpScore = Math.min(xp / 1000, 1) * 40; // Max 40 points
-    const consistencyScore = (consistency ?? 0) * 20; // Max 20 points
+  if (user.activitySnapshot) {
+    return user;
+  }
 
-    return streakScore + xpScore + consistencyScore;
+  return {
+    ...user,
+    activitySnapshot: getUserActivityScore(user.id),
   };
+}
 
-  const activity1 = getActivityLevel(user1);
-  const activity2 = getActivityLevel(user2);
+function calculateActivityCompatibility(user1, user2) {
+  const left = ensureActivitySnapshot(user1).activitySnapshot;
+  const right = ensureActivitySnapshot(user2).activitySnapshot;
 
-  const gap = Math.abs(activity1 - activity2);
-  if (gap <= 10) return 100; // Same activity level
-  if (gap <= 25) return 75;
-  if (gap <= 50) return 50;
-  if (gap <= 75) return 25;
+  if (left.activeLast7Days && right.activeLast7Days) {
+    return 100;
+  }
+  if (left.activeLast7Days || right.activeLast7Days) {
+    return 50;
+  }
   return 0;
 }
 
-/**
- * Main compatibility scoring function
- * Returns weighted score (0-100)
- */
-export function calculateCompatibilityScore(user1, user2) {
-  const goalScore = calculateGoalCompatibility(user1.goal, user2.goal);
-  const experienceScore = calculateExperienceCompatibility(
-    user1.experience,
-    user2.experience
-  );
-  const scheduleScore = calculateScheduleCompatibility(
-    user1.preferredTime,
-    user2.preferredTime
-  );
-  const ageScore = calculateAgeCompatibility(user1.age, user2.age);
-  const activityScore = calculateActivityCompatibility(user1, user2);
-
-  const totalScore =
-    goalScore * WEIGHTS.goal +
-    experienceScore * WEIGHTS.experience +
-    scheduleScore * WEIGHTS.schedule +
-    ageScore * WEIGHTS.age +
-    activityScore * WEIGHTS.activity;
-
-  return Math.round(totalScore);
+function getMatchLabel(score) {
+  if (score >= 90) {
+    return "Perfect";
+  }
+  if (score >= 75) {
+    return "Great";
+  }
+  if (score >= 60) {
+    return "Good";
+  }
+  if (score >= 45) {
+    return "Possible";
+  }
+  return "Low";
 }
 
-/**
- * Determines match tier based on compatibility score
- */
-function getMatchTier(score) {
-  if (score >= 85) return "Elite match";
-  if (score >= 72) return "Strong match";
-  if (score >= 60) return "Good fit";
-  if (score >= 50) return "Potential fit";
-  return "Not compatible";
+function buildCompatibilityReasons(user1, user2, scores) {
+  const reasons = [];
+
+  if (scores.goal === 100) {
+    reasons.push("Same fitness goal");
+  } else if (scores.goal >= 80) {
+    reasons.push("Strong goal alignment");
+  }
+
+  if (scores.schedule === 100) {
+    reasons.push("Same schedule");
+  } else if (scores.schedule >= 40) {
+    reasons.push("Similar schedule");
+  }
+
+  if (scores.experience >= 70) {
+    reasons.push("Similar experience");
+  }
+
+  if (scores.age >= 80) {
+    reasons.push("Close age range");
+  }
+
+  if (scores.activity === 100) {
+    reasons.push("Both active this week");
+  } else if (scores.activity === 50) {
+    reasons.push("One of you has fresh momentum");
+  }
+
+  if (
+    String(user1.city ?? "").trim() &&
+    String(user1.city ?? "").trim().toLowerCase() ===
+      String(user2.city ?? "").trim().toLowerCase()
+  ) {
+    reasons.push("Same city");
+  }
+
+  return reasons.slice(0, 4);
 }
 
-/**
- * Ranks matches by compatibility and returns top N
- * Applies filtering to exclude blocked users, incomplete profiles
- */
-export function rankMatches(myId, limit = 20) {
-  const blockedUserIds = getBlockedUserIds(myId);
+function getRequiredProfileFields(user) {
+  return ["age", "gym", "goal", "experience", "preferredTime"].filter(
+    (field) => user?.[field] === null || user?.[field] === undefined || user?.[field] === ""
+  );
+}
 
-  const me = db
-    .prepare(
-      `
-    SELECT id, name, age, gym, city, goal, experience, preferredTime, 
-           streak, consistency, xp, level, bio, avatarUrl, 
-           locationLabel, locationLat, locationLng
+function haveUsersAlreadyMatched(userId1, userId2) {
+  const message = db.prepare(`
+    SELECT id
+    FROM messages
+    WHERE
+      (senderId = ? AND receiverId = ?)
+      OR
+      (senderId = ? AND receiverId = ?)
+    LIMIT 1
+  `).get(userId1, userId2, userId2, userId1);
+
+  if (message) {
+    return true;
+  }
+
+  const matched = db.prepare(`
+    SELECT id
+    FROM match_feedback
+    WHERE
+      ((userA = ? AND userB = ?) OR (userA = ? AND userB = ?))
+      AND label = 1
+    LIMIT 1
+  `).get(userId1, userId2, userId2, userId1);
+
+  return Boolean(matched);
+}
+
+function loadRankCandidates(currentUserId) {
+  const blockedUserIds = getRelationshipBlockedUserIds(currentUserId);
+  const currentUser = db.prepare(`
+    SELECT
+      id,
+      name,
+      age,
+      gym,
+      city,
+      goal,
+      experience,
+      preferredTime,
+      streak,
+      consistency,
+      xp,
+      level,
+      bio,
+      avatarUrl,
+      locationLabel,
+      locationLat,
+      locationLng,
+      lastActiveAt
     FROM users
     WHERE id = ?
-  `
-    )
-    .get(myId);
+  `).get(currentUserId);
 
-  if (!me) return { error: "User not found", matches: [] };
-
-  const required = ["age", "gym", "goal", "experience", "preferredTime"];
-  const incomplete = required.some(
-    (key) => me[key] === null || me[key] === undefined || me[key] === ""
-  );
-
-  if (incomplete) {
-    return { error: "PROFILE_INCOMPLETE", matches: [] };
+  if (!currentUser) {
+    return { error: "USER_NOT_FOUND", currentUser: null, candidates: [] };
   }
 
   const placeholders = blockedUserIds.map(() => "?").join(", ");
-  const othersQuery = `
-    SELECT id, name, age, gym, city, goal, experience, preferredTime, 
-           streak, consistency, xp, level, bio, avatarUrl, 
-           locationLabel, locationLat, locationLng
+  const candidates = db.prepare(`
+    SELECT
+      id,
+      name,
+      age,
+      gym,
+      city,
+      goal,
+      experience,
+      preferredTime,
+      streak,
+      consistency,
+      xp,
+      level,
+      bio,
+      avatarUrl,
+      locationLabel,
+      locationLat,
+      locationLng,
+      lastActiveAt
     FROM users
     WHERE id != ?
-      ${blockedUserIds.length > 0 ? `AND id NOT IN (${placeholders})` : ""}
-      AND age IS NOT NULL
-      AND gym IS NOT NULL
-      AND goal IS NOT NULL
-      AND experience IS NOT NULL
-      AND preferredTime IS NOT NULL
-  `;
+      ${blockedUserIds.length ? `AND id NOT IN (${placeholders})` : ""}
+  `).all(currentUserId, ...blockedUserIds);
 
-  const others = db.prepare(othersQuery).all(myId, ...blockedUserIds);
+  return { currentUser, candidates };
+}
 
-  const matches = others
-    .map((other) => {
-      const compatibilityScore = calculateCompatibilityScore(me, other);
-      const tier = getMatchTier(compatibilityScore);
-      const canChat = compatibilityScore >= 60;
+export function calculateCompatibility(userA, userB) {
+  const left = ensureActivitySnapshot(userA);
+  const right = ensureActivitySnapshot(userB);
 
+  const breakdown = {
+    goal: calculateGoalCompatibility(left.goal, right.goal),
+    experience: calculateExperienceCompatibility(left.experience, right.experience),
+    schedule: calculateScheduleCompatibility(left.preferredTime, right.preferredTime),
+    age: calculateAgeCompatibility(left.age, right.age),
+    activity: calculateActivityCompatibility(left, right),
+  };
+
+  const score = Math.round(
+    breakdown.goal * WEIGHTS.goal +
+      breakdown.experience * WEIGHTS.experience +
+      breakdown.schedule * WEIGHTS.schedule +
+      breakdown.age * WEIGHTS.age +
+      breakdown.activity * WEIGHTS.activity
+  );
+
+  return {
+    score,
+    breakdown,
+    matchLabel: getMatchLabel(score),
+    compatibilityReasons: buildCompatibilityReasons(left, right, breakdown),
+  };
+}
+
+export function calculateCompatibilityScore(userA, userB) {
+  return calculateCompatibility(userA, userB).score;
+}
+
+export function rankMatches(currentUserOrId, allUsersOrLimit = [], options = {}) {
+  let currentUser = currentUserOrId;
+  let candidates = Array.isArray(allUsersOrLimit) ? allUsersOrLimit : null;
+  const limit =
+    typeof allUsersOrLimit === "number"
+      ? allUsersOrLimit
+      : Number(options.limit ?? 20);
+
+  if (typeof currentUserOrId === "number") {
+    const loaded = loadRankCandidates(currentUserOrId);
+    if (loaded.error) {
+      return { error: loaded.error, matches: [] };
+    }
+    currentUser = loaded.currentUser;
+    candidates = loaded.candidates;
+  }
+
+  const missingFields = getRequiredProfileFields(currentUser);
+  if (missingFields.length > 0) {
+    return { error: "PROFILE_INCOMPLETE", missingFields, matches: [] };
+  }
+
+  const matches = (candidates ?? [])
+    .filter((candidate) => getRequiredProfileFields(candidate).length === 0)
+    .filter((candidate) => !haveUsersAlreadyMatched(currentUser.id, candidate.id))
+    .map((candidate) => {
+      const compatibility = calculateCompatibility(currentUser, candidate);
       return {
-        id: other.id,
-        name: other.name,
-        age: other.age,
-        bio: other.bio,
-        avatarUrl: other.avatarUrl,
-        goal: other.goal,
-        experience: other.experience,
-        preferredTime: other.preferredTime,
-        gym: other.gym,
-        city: other.city,
-        level: other.level,
-        xp: other.xp,
-        streak: other.streak,
-        compatibility: compatibilityScore,
-        tier,
-        canChat,
-        locationLabel: other.locationLabel,
-        locationLat: other.locationLat,
-        locationLng: other.locationLng,
+        ...candidate,
+        compatibility: compatibility.score,
+        matchLabel: compatibility.matchLabel,
+        compatibilityReasons: compatibility.compatibilityReasons,
+        breakdown: compatibility.breakdown,
+        canChat: compatibility.score >= 60,
       };
     })
-    .sort((a, b) => b.compatibility - a.compatibility)
-    .slice(0, limit);
+    .sort((left, right) => right.compatibility - left.compatibility)
+    .slice(0, Math.min(20, limit));
 
   return { matches };
 }
 
-/**
- * Gets match breakdown for detailed view
- * Shows component scores and reasons
- */
 export function getMatchBreakdown(userId1, userId2) {
-  const user1 = db
-    .prepare(
-      `
-    SELECT id, name, age, gym, city, goal, experience, preferredTime,
-           streak, consistency, xp, level
+  const user1 = db.prepare(`
+    SELECT id, name, age, gym, city, goal, experience, preferredTime, lastActiveAt
     FROM users
     WHERE id = ?
-  `
-    )
-    .get(userId1);
+  `).get(userId1);
 
-  const user2 = db
-    .prepare(
-      `
-    SELECT id, name, age, gym, city, goal, experience, preferredTime,
-           streak, consistency, xp, level
+  const user2 = db.prepare(`
+    SELECT id, name, age, gym, city, goal, experience, preferredTime, lastActiveAt
     FROM users
     WHERE id = ?
-  `
-    )
-    .get(userId2);
+  `).get(userId2);
 
-  if (!user1 || !user2) return null;
+  if (!user1 || !user2) {
+    return null;
+  }
 
-  const goalScore = calculateGoalCompatibility(user1.goal, user2.goal);
-  const experienceScore = calculateExperienceCompatibility(
-    user1.experience,
-    user2.experience
-  );
-  const scheduleScore = calculateScheduleCompatibility(
-    user1.preferredTime,
-    user2.preferredTime
-  );
-  const ageScore = calculateAgeCompatibility(user1.age, user2.age);
-  const activityScore = calculateActivityCompatibility(user1, user2);
-
-  const totalScore = calculateCompatibilityScore(user1, user2);
-  const tier = getMatchTier(totalScore);
-
-  const reasons = [];
-  if (goalScore === 100) reasons.push("Identical fitness goals");
-  else if (goalScore >= 60) reasons.push("Compatible fitness goals");
-
-  if (experienceScore === 100) reasons.push("Same experience level");
-  else if (experienceScore >= 70) reasons.push("Compatible experience");
-
-  if (scheduleScore === 100) reasons.push("Perfect schedule alignment");
-  else if (scheduleScore >= 70) reasons.push("Good schedule overlap");
-
-  if (ageScore >= 80) reasons.push("Very similar age");
-  else if (ageScore >= 50) reasons.push("Similar age range");
-
-  if (activityScore >= 75) reasons.push("Similar dedication levels");
-
+  const compatibility = calculateCompatibility(user1, user2);
   return {
-    totalScore,
-    tier,
-    reasons,
-    breakdown: {
-      goal: {
-        score: goalScore,
-        weight: WEIGHTS.goal,
-        weighted: Math.round(goalScore * WEIGHTS.goal),
-      },
-      experience: {
-        score: experienceScore,
-        weight: WEIGHTS.experience,
-        weighted: Math.round(experienceScore * WEIGHTS.experience),
-      },
-      schedule: {
-        score: scheduleScore,
-        weight: WEIGHTS.schedule,
-        weighted: Math.round(scheduleScore * WEIGHTS.schedule),
-      },
-      age: {
-        score: ageScore,
-        weight: WEIGHTS.age,
-        weighted: Math.round(ageScore * WEIGHTS.age),
-      },
-      activity: {
-        score: activityScore,
-        weight: WEIGHTS.activity,
-        weighted: Math.round(activityScore * WEIGHTS.activity),
-      },
-    },
+    totalScore: compatibility.score,
+    score: compatibility.score,
+    tier: compatibility.matchLabel,
+    matchLabel: compatibility.matchLabel,
+    reasons: compatibility.compatibilityReasons,
+    compatibilityReasons: compatibility.compatibilityReasons,
+    breakdown: compatibility.breakdown,
   };
 }
 
-/**
- * Helper function to get blocked user IDs
- * (Imported from relationships.js but defined here for completeness)
- */
-function getBlockedUserIds(userId) {
-  try {
-    const result = db
-      .prepare(
-        `
-      SELECT blockedUserId FROM blocked_users
-      WHERE userId = ?
-    `
-      )
-      .all(userId);
-    return result.map((row) => row.blockedUserId);
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Track user match activity for analytics
- */
 export function logMatchInteraction(viewerId, viewedId, action) {
   try {
-    const timestamp = new Date().toISOString();
-    db.prepare(
-      `
-      INSERT OR IGNORE INTO match_interactions 
-        (viewerId, viewedId, action, createdAt)
+    db.prepare(`
+      INSERT INTO match_interactions (viewerId, viewedId, action, createdAt)
       VALUES (?, ?, ?, ?)
-    `
-    ).run(viewerId, viewedId, action, timestamp);
-  } catch (err) {
-    console.error("Failed to log match interaction:", err);
+    `).run(viewerId, viewedId, action, new Date().toISOString());
+  } catch {
+    return null;
   }
+  return true;
 }
 
-/**
- * Gets user's match history (viewed/liked/passed)
- */
 export function getUserMatchHistory(userId, action = null, limit = 50) {
   let query = `
     SELECT viewedId, action, createdAt
@@ -416,20 +427,21 @@ export function getUserMatchHistory(userId, action = null, limit = 50) {
   `;
 
   if (action) {
-    query += ` AND action = ?`;
+    query += " AND action = ?";
   }
 
-  query += ` ORDER BY createdAt DESC LIMIT ?`;
+  query += " ORDER BY datetime(createdAt) DESC, id DESC LIMIT ?";
 
   const params = action ? [userId, action, limit] : [userId, limit];
   return db.prepare(query).all(...params);
 }
 
 export default {
+  WEIGHTS,
+  calculateCompatibility,
   calculateCompatibilityScore,
   rankMatches,
   getMatchBreakdown,
   logMatchInteraction,
   getUserMatchHistory,
-  WEIGHTS,
 };

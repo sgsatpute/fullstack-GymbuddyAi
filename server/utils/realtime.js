@@ -1,240 +1,122 @@
-/**
- * PROMPT 9: Real-time Features
- * Presence system, typing indicators, read receipts, notifications
- * Uses Socket.io
- */
-
 import db from "../db.js";
 
-export class RealtimeManager {
-  constructor(io) {
-    this.io = io;
-    this.userSessions = new Map(); // userId -> { socketId, lastSeen, status }
-    this.typingUsers = new Set(); // userId:conversationId
+const realtimeState = {
+  io: null,
+  onlineUsers: new Map(),
+};
+
+function normalizeUserId(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+export function setRealtimeServer(io, onlineUsers = new Map()) {
+  realtimeState.io = io;
+  realtimeState.onlineUsers = onlineUsers;
+}
+
+export function getRealtimeServer() {
+  return realtimeState.io;
+}
+
+export function attachOnlineUser(userId, socketId) {
+  const normalizedUserId = normalizeUserId(userId);
+  if (!normalizedUserId || !socketId) {
+    return null;
   }
 
-  /**
-   * User comes online
-   */
-  userOnline(userId, socketId) {
-    this.userSessions.set(userId, {
-      socketId,
-      lastSeen: new Date().toISOString(),
-      status: "online",
-    });
+  realtimeState.onlineUsers.set(normalizedUserId, socketId);
+  return normalizedUserId;
+}
 
-    // Broadcast to all connected users
-    this.io.emit("user:online", { userId, timestamp: new Date().toISOString() });
-
-    // Update database
-    db.prepare("UPDATE users SET lastCheckinTime = ? WHERE id = ?").run(
-      new Date().toISOString(),
-      userId
-    );
-  }
-
-  /**
-   * User goes offline
-   */
-  userOffline(userId) {
-    const session = this.userSessions.get(userId);
-    if (session) {
-      session.status = "idle";
-      session.lastSeen = new Date().toISOString();
-
-      this.io.emit("user:offline", {
-        userId,
-        lastSeen: session.lastSeen,
-      });
+export function detachOnlineSocket(socketId) {
+  for (const [userId, storedSocketId] of realtimeState.onlineUsers.entries()) {
+    if (storedSocketId === socketId) {
+      realtimeState.onlineUsers.delete(userId);
+      return userId;
     }
   }
 
-  /**
-   * Get user online status
-   */
-  getUserStatus(userId) {
-    const session = this.userSessions.get(userId);
-    if (!session) return "offline";
-    return session.status;
-  }
+  return null;
+}
 
-  /**
-   * Broadcast typing indicator
-   */
-  userTyping(userId, conversationId) {
-    const typingKey = `${userId}:${conversationId}`;
-    this.typingUsers.add(typingKey);
+export function getOnlineUsers() {
+  return realtimeState.onlineUsers;
+}
 
-    this.io.to(`conversation:${conversationId}`).emit("user:typing", {
-      userId,
-      typing: true,
-    });
+export function isUserOnline(userId) {
+  return realtimeState.onlineUsers.has(Number(userId));
+}
 
-    // Auto-clear after 3 seconds
-    setTimeout(() => {
-      this.typingUsers.delete(typingKey);
-      this.io.to(`conversation:${conversationId}`).emit("user:typing", {
-        userId,
-        typing: false,
-      });
-    }, 3000);
-  }
-
-  /**
-   * Mark message as read
-   */
-  markMessageRead(messageId, readBy) {
-    db.prepare(
-      "UPDATE messages SET seen = 1, readAt = ? WHERE id = ? AND receiverId = ?"
-    ).run(new Date().toISOString(), messageId, readBy);
-
-    // Broadcast read receipt
-    const message = db.prepare("SELECT senderId, receiverId FROM messages WHERE id = ?").get(messageId);
-
-    this.io.to(`user:${message.senderId}`).emit("message:read", {
-      messageId,
-      readBy,
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  /**
-   * Send notification to user
-   */
-  notifyUser(userId, notification) {
-    const session = this.userSessions.get(userId);
-    if (session) {
-      this.io.to(session.socketId).emit("notification", {
-        ...notification,
-        timestamp: new Date().toISOString(),
-      });
+export function getOnlineStatusMap(ids = []) {
+  return ids.reduce((accumulator, id) => {
+    const normalizedId = Number(id);
+    if (Number.isInteger(normalizedId)) {
+      accumulator[normalizedId] = isUserOnline(normalizedId);
     }
+    return accumulator;
+  }, {});
+}
 
-    // Save to database for history
-    db.prepare(`
-      INSERT INTO notifications (userId, type, message, data, read, createdAt)
-      VALUES (?, ?, ?, ?, 0, ?)
-    `).run(
-      userId,
-      notification.type,
-      notification.message,
-      JSON.stringify(notification.data || {}),
-      new Date().toISOString()
-    );
+export function emitToUser(userId, eventName, payload) {
+  const socketId = realtimeState.onlineUsers.get(Number(userId));
+  if (!realtimeState.io || !socketId) {
+    return false;
   }
 
-  /**
-   * Broadcast activity update (leaderboard change, level up, etc.)
-   */
-  broadcastActivity(activity) {
-    this.io.emit("activity:broadcast", {
-      ...activity,
-      timestamp: new Date().toISOString(),
-    });
-  }
+  realtimeState.io.to(socketId).emit(eventName, payload);
+  return true;
+}
 
-  /**
-   * Get online users
-   */
-  getOnlineUsers() {
-    const onlineUsers = [];
-    this.userSessions.forEach((session, userId) => {
-      if (session.status === "online") {
-        onlineUsers.push({
-          userId,
-          lastSeen: session.lastSeen,
-        });
-      }
-    });
-    return onlineUsers;
+export function emitToUsers(userIds, eventName, payload) {
+  for (const userId of userIds) {
+    emitToUser(userId, eventName, payload);
   }
 }
 
-/**
- * Initialize Socket.io event handlers
- */
-export function initializeRealtimeHandlers(io) {
-  const realtimeManager = new RealtimeManager(io);
+export function broadcast(eventName, payload) {
+  if (!realtimeState.io) {
+    return false;
+  }
 
-  io.on("connection", (socket) => {
-    console.log(`[Socket] Client connected: ${socket.id}`);
+  realtimeState.io.emit(eventName, payload);
+  return true;
+}
 
-    // User authentication and online status
-    socket.on("user:authenticate", (userId) => {
-      socket.join(`user:${userId}`);
-      socket.join(`notifications:${userId}`);
-      realtimeManager.userOnline(userId, socket.id);
-      console.log(`[Socket] User ${userId} authenticated`);
-    });
+export function createNotification(userId, notification) {
+  const createdAt = new Date().toISOString();
+  const payload = {
+    type: notification.type ?? "message",
+    title: notification.title ?? "GymBuddy AI",
+    body: notification.body ?? "",
+    link: notification.link ?? null,
+    data: notification.data ?? null,
+    createdAt,
+  };
 
-    // Chat room joining
-    socket.on("chat:join", (conversationId) => {
-      socket.join(`conversation:${conversationId}`);
-      socket.broadcast.to(`conversation:${conversationId}`).emit("chat:user-joined", {
-        timestamp: new Date().toISOString(),
-      });
-    });
+  const result = db.prepare(`
+    INSERT INTO notifications (userId, type, title, body, link, data, read, createdAt)
+    VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+  `).run(
+    userId,
+    payload.type,
+    payload.title,
+    payload.body,
+    payload.link,
+    payload.data ? JSON.stringify(payload.data) : null,
+    createdAt
+  );
 
-    // Message received
-    socket.on("message:send", (data) => {
-      const { conversationId, messageId } = data;
-      socket.broadcast.to(`conversation:${conversationId}`).emit("message:new", {
-        messageId,
-        ...data,
-        timestamp: new Date().toISOString(),
-      });
-    });
-
-    // Typing indicator
-    socket.on("user:typing", (data) => {
-      const { userId, conversationId } = data;
-      realtimeManager.userTyping(userId, conversationId);
-    });
-
-    // Message read receipt
-    socket.on("message:read", (data) => {
-      const { messageId, readBy } = data;
-      realtimeManager.markMessageRead(messageId, readBy);
-    });
-
-    // Leaderboard update
-    socket.on("leaderboard:update", (data) => {
-      io.emit("leaderboard:updated", data);
-    });
-
-    // Match event
-    socket.on("match:new", (data) => {
-      const { userId, matchUserId } = data;
-      socket.broadcast.to(`user:${userId}`).emit("notification", {
-        type: "match",
-        message: "You have a new match!",
-        data,
-      });
-      socket.broadcast.to(`user:${matchUserId}`).emit("notification", {
-        type: "match",
-        message: "You have a new match!",
-        data,
-      });
-    });
-
-    // Level up notification
-    socket.on("user:level-up", (data) => {
-      const { userId, newLevel } = data;
-      io.emit("activity:broadcast", {
-        type: "level-up",
-        userId,
-        newLevel,
-        message: `${data.userName} reached Level ${newLevel}! 🚀`,
-      });
-    });
-
-    // Disconnect
-    socket.on("disconnect", () => {
-      console.log(`[Socket] Client disconnected: ${socket.id}`);
-    });
+  emitToUser(userId, "notification", {
+    id: Number(result.lastInsertRowid),
+    ...payload,
+    read: 0,
   });
 
-  return realtimeManager;
+  return {
+    id: Number(result.lastInsertRowid),
+    userId,
+    read: 0,
+    ...payload,
+  };
 }
-
-export default RealtimeManager;
