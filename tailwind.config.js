@@ -15,7 +15,13 @@ export default {
         warning: "var(--warning)",
         text: "var(--text)",
         muted: "var(--muted)",
+        surface: "#13131a",
+        surface2: "#1c1c27",
+        "electric-500": "#7c6ef5",
+        "electric-600": "#6b5ce6",
+        "navy-900": "#0a0a0f",
       },
     },
   },
+  plugins: [],
 };
