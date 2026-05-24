@@ -5,6 +5,7 @@ import Coach from "./components/Coach";
 import CompleteProfile from "./components/CompleteProfile";
 import Dashboard from "./components/Dashboard";
 import ForgotPassword from "./components/ForgotPassword";
+import Groups from "./components/Groups";
 import Home from "./components/Home";
 import Inbox from "./components/Inbox";
 import Leaderboard from "./components/Leaderboard";
@@ -13,6 +14,7 @@ import Matches from "./components/Matches";
 import Nutrition from "./components/Nutrition";
 import Profile from "./components/Profile";
 import Register from "./components/Register";
+import BodyProgress from "./components/BodyProgress";
 import { getCurrentUserId, hasStoredToken } from "./utils/auth";
 
 function Protected({ children }: { children: JSX.Element }) {
@@ -96,6 +98,22 @@ export default function App() {
           element={
             <ProtectedShell>
               <Inbox />
+            </ProtectedShell>
+          }
+        />
+        <Route
+          path="/groups"
+          element={
+            <ProtectedShell>
+              <Groups />
+            </ProtectedShell>
+          }
+        />
+        <Route
+          path="/body-progress"
+          element={
+            <ProtectedShell>
+              <BodyProgress />
             </ProtectedShell>
           }
         />

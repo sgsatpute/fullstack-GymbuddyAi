@@ -3,11 +3,24 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import multer from "multer";
+import anthropicCoach from "../utils/anthropic.js";
 import db from "../db.js";
 import auth from "../middleware/auth.js";
-import { logActivity } from "../utils/activity.js";
-import { analyzeFoodImage } from "../utils/foodAnalysis.js";
 import {
+  foodAnalysisLimiter,
+  progressAnalysisLimiter,
+} from "../middleware/rateLimit.js";
+import {
+  analyzeFoodImage,
+  analyzeFoodText,
+  analyzeNutritionPattern,
+  generateMealPlan,
+} from "../utils/foodAnalysis.js";
+import { findIndianFoods } from "../utils/indianFoods.js";
+import { logActivity } from "../utils/activity.js";
+import { awardXP, XP_REWARDS } from "../utils/xpSystem.js";
+import {
+  getDailyNutritionTargets,
   getMealEntries,
   getNutritionHistory,
   getNutritionSummary,
@@ -18,26 +31,20 @@ import { toLocalDateString } from "../utils/fitness.js";
 
 const router = express.Router();
 const foodUploadsDir = path.resolve(process.cwd(), "server", "uploads", "foods");
+const searchCache = new Map();
+const insightsCache = new Map();
 
 fs.mkdirSync(foodUploadsDir, { recursive: true });
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 6 * 1024 * 1024,
-  },
+  limits: { fileSize: 6 * 1024 * 1024 },
   fileFilter: (_req, file, callback) => {
-    const allowedMimeTypes = new Set([
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ]);
-
+    const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
     if (!allowedMimeTypes.has(file.mimetype)) {
       callback(new Error("Only JPEG, PNG, or WebP uploads are allowed"));
       return;
     }
-
     callback(null, true);
   },
 });
@@ -57,7 +64,7 @@ function getExtensionFromMimeType(mimeType) {
   return "jpg";
 }
 
-function buildNutritionPayload(userId, mealDate) {
+function buildNutritionOverview(userId, mealDate) {
   return {
     date: mealDate,
     summary: getNutritionSummary(userId, mealDate),
@@ -66,10 +73,160 @@ function buildNutritionPayload(userId, mealDate) {
   };
 }
 
+function buildTodayPayload(userId, mealDate = toLocalDateString()) {
+  const summary = getNutritionSummary(userId, mealDate);
+  return {
+    date: mealDate,
+    entries: getMealEntries(userId, { mealDate }),
+    totals: summary.totals,
+    goalProgress: summary.progress,
+    summary,
+  };
+}
+
+function sanitizeQuery(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+async function searchOpenFoodFacts(query) {
+  const cacheKey = sanitizeQuery(query);
+  const cached = searchCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.results;
+  }
+
+  const url =
+    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}` +
+    "&search_simple=1&action=process&json=1&page_size=10&fields=product_name,nutriments,serving_size,brands";
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = await response.json();
+  const results = Array.isArray(data?.products)
+    ? data.products
+        .map((product) => ({
+          name: product.product_name,
+          calories:
+            Number(product?.nutriments?.["energy-kcal_serving"]) ||
+            Number(product?.nutriments?.["energy-kcal_100g"]) ||
+            0,
+          protein:
+            Number(product?.nutriments?.proteins_serving) ||
+            Number(product?.nutriments?.proteins_100g) ||
+            0,
+          carbs:
+            Number(product?.nutriments?.carbohydrates_serving) ||
+            Number(product?.nutriments?.carbohydrates_100g) ||
+            0,
+          fat:
+            Number(product?.nutriments?.fat_serving) ||
+            Number(product?.nutriments?.fat_100g) ||
+            0,
+          servingSize: product.serving_size || "1 serving",
+          brand: product.brands || "OpenFoodFacts",
+          source: "openFoodFacts",
+        }))
+        .filter((product) => product.name)
+    : [];
+
+  searchCache.set(cacheKey, {
+    results,
+    expiresAt: Date.now() + 60 * 60 * 1000,
+  });
+
+  return results;
+}
+
+function validateMeal(meal) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(meal.mealDate)) {
+    return "Provide a valid meal date";
+  }
+  if (!isValidMealType(meal.mealType)) {
+    return "Choose a valid meal type";
+  }
+  if (meal.title.length < 2 || meal.title.length > 120) {
+    return "Meal title should be 2 to 120 characters";
+  }
+  if (meal.calories <= 0) {
+    return "Calories must be greater than zero";
+  }
+  if (meal.notes.length > 500) {
+    return "Notes should stay under 500 characters";
+  }
+  return null;
+}
+
+function insertMeal(userId, meal) {
+  const result = db.prepare(`
+    INSERT INTO meal_entries (
+      userId,
+      mealDate,
+      mealType,
+      title,
+      calories,
+      proteinGrams,
+      carbsGrams,
+      fatGrams,
+      fiberGrams,
+      notes,
+      imageUrl,
+      source
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    userId,
+    meal.mealDate,
+    meal.mealType,
+    meal.title,
+    meal.calories,
+    meal.proteinGrams,
+    meal.carbsGrams,
+    meal.fatGrams,
+    meal.fiberGrams,
+    meal.notes || null,
+    meal.imageUrl,
+    meal.source
+  );
+
+  const savedMeal = db.prepare(`
+    SELECT
+      id,
+      userId,
+      mealDate,
+      mealType,
+      title,
+      calories,
+      proteinGrams,
+      carbsGrams,
+      fatGrams,
+      fiberGrams,
+      notes,
+      imageUrl,
+      source,
+      createdAt
+    FROM meal_entries
+    WHERE id = ?
+  `).get(result.lastInsertRowid);
+
+  logActivity(userId, "meal_logged", {
+    mealType: meal.mealType,
+    title: meal.title,
+    calories: meal.calories,
+    proteinGrams: meal.proteinGrams,
+    source: meal.source,
+  });
+  awardXP(userId, XP_REWARDS.log_nutrition, "log_nutrition");
+
+  return savedMeal;
+}
+
 router.get("/", auth, (req, res) => {
   try {
     const mealDate = getSafeDate(req.query?.date);
-    res.json(buildNutritionPayload(req.user.id, mealDate));
+    res.json(buildNutritionOverview(req.user.id, mealDate));
   } catch {
     res.status(500).json({ error: "Failed to load nutrition data" });
   }
@@ -78,93 +235,132 @@ router.get("/", auth, (req, res) => {
 router.post("/", auth, (req, res) => {
   try {
     const meal = normalizeMealEntry(req.body);
-
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(meal.mealDate)) {
-      return res.status(400).json({ error: "Provide a valid meal date" });
+    const error = validateMeal(meal);
+    if (error) {
+      return res.status(400).json({ error });
     }
 
-    if (!isValidMealType(meal.mealType)) {
-      return res.status(400).json({ error: "Choose a valid meal type" });
-    }
-
-    if (meal.title.length < 2 || meal.title.length > 80) {
-      return res.status(400).json({ error: "Meal title should be 2 to 80 characters" });
-    }
-
-    if (meal.calories <= 0) {
-      return res.status(400).json({ error: "Calories must be greater than zero" });
-    }
-
-    if (meal.notes.length > 500) {
-      return res.status(400).json({ error: "Notes should stay under 500 characters" });
-    }
-
-    const result = db.prepare(`
-      INSERT INTO meal_entries (
-        userId,
-        mealDate,
-        mealType,
-        title,
-        calories,
-        proteinGrams,
-        carbsGrams,
-        fatGrams,
-        fiberGrams,
-        notes,
-        imageUrl,
-        source
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      req.user.id,
-      meal.mealDate,
-      meal.mealType,
-      meal.title,
-      meal.calories,
-      meal.proteinGrams,
-      meal.carbsGrams,
-      meal.fatGrams,
-      meal.fiberGrams,
-      meal.notes || null,
-      meal.imageUrl,
-      meal.source
-    );
-
-    logActivity(req.user.id, "meal_logged", {
-      mealType: meal.mealType,
-      title: meal.title,
-      calories: meal.calories,
-      proteinGrams: meal.proteinGrams,
-      source: meal.source,
-    });
-
-    const savedMeal = db.prepare(`
-      SELECT
-        id,
-        userId,
-        mealDate,
-        mealType,
-        title,
-        calories,
-        proteinGrams,
-        carbsGrams,
-        fatGrams,
-        fiberGrams,
-        notes,
-        imageUrl,
-        source,
-        createdAt
-      FROM meal_entries
-      WHERE id = ?
-    `).get(result.lastInsertRowid);
-
-    res.status(201).json({
-      success: true,
-      meal: savedMeal,
-      ...buildNutritionPayload(req.user.id, meal.mealDate),
-    });
+    insertMeal(req.user.id, meal);
+    res.status(201).json(buildNutritionOverview(req.user.id, meal.mealDate));
   } catch {
     res.status(500).json({ error: "Failed to save meal" });
+  }
+});
+
+router.get("/search", auth, async (req, res) => {
+  try {
+    const query = String(req.query.q ?? "").trim();
+    if (!query) {
+      return res.json([]);
+    }
+
+    const indianMatches = findIndianFoods(query);
+    if (indianMatches.length > 0) {
+      return res.json(indianMatches);
+    }
+
+    return res.json(await searchOpenFoodFacts(query));
+  } catch {
+    return res.status(500).json({ error: "Failed to search food database" });
+  }
+});
+
+router.post("/analyze-text", auth, foodAnalysisLimiter, async (req, res) => {
+  try {
+    const description = String(req.body?.description ?? "").trim();
+    if (!description) {
+      return res.status(400).json({ error: "Food description is required" });
+    }
+
+    const user = db.prepare(`
+      SELECT goal
+      FROM users
+      WHERE id = ?
+    `).get(req.user.id);
+
+    const analysis = await analyzeFoodText(description, user?.goal ?? "fitness");
+    return res.json(analysis);
+  } catch {
+    return res.status(500).json({ error: "Failed to analyze meal description" });
+  }
+});
+
+router.post("/log", auth, (req, res) => {
+  try {
+    const meal = normalizeMealEntry(req.body);
+    const error = validateMeal(meal);
+    if (error) {
+      return res.status(400).json({ error });
+    }
+
+    const savedMeal = insertMeal(req.user.id, meal);
+    return res.status(201).json({
+      meal: savedMeal,
+      ...buildTodayPayload(req.user.id, meal.mealDate),
+    });
+  } catch {
+    return res.status(500).json({ error: "Failed to log nutrition entry" });
+  }
+});
+
+router.get("/today", auth, (req, res) => {
+  try {
+    res.json(buildTodayPayload(req.user.id, getSafeDate(req.query?.date)));
+  } catch {
+    res.status(500).json({ error: "Failed to load today's nutrition" });
+  }
+});
+
+router.get("/history", auth, (req, res) => {
+  try {
+    res.json(getNutritionHistory(req.user.id, 30).reverse());
+  } catch {
+    res.status(500).json({ error: "Failed to load nutrition history" });
+  }
+});
+
+router.get("/weekly-insights", auth, progressAnalysisLimiter, async (req, res) => {
+  try {
+    const cacheKey = `nutrition-insights:${req.user.id}`;
+    const cached = insightsCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.json(cached.payload);
+    }
+
+    const entries = getNutritionHistory(req.user.id, 7).reverse();
+    const user = db.prepare(`
+      SELECT goal
+      FROM users
+      WHERE id = ?
+    `).get(req.user.id);
+
+    const payload = await analyzeNutritionPattern(entries, user?.goal ?? "fitness");
+    insightsCache.set(cacheKey, {
+      payload,
+      expiresAt: Date.now() + 6 * 60 * 60 * 1000,
+    });
+
+    return res.json(payload);
+  } catch {
+    return res.status(500).json({ error: "Failed to load weekly nutrition insights" });
+  }
+});
+
+router.post("/meal-plan", auth, async (req, res) => {
+  try {
+    const user = db.prepare(`
+      SELECT name, age, goal, experience, preferredTime, city
+      FROM users
+      WHERE id = ?
+    `).get(req.user.id);
+
+    const caloricGoal =
+      Number(req.body?.caloricGoal) ||
+      getDailyNutritionTargets(user).calories;
+
+    res.json(await generateMealPlan(user, caloricGoal));
+  } catch {
+    res.status(500).json({ error: "Failed to build meal plan" });
   }
 });
 

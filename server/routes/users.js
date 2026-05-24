@@ -1,9 +1,11 @@
 import express from "express";
 import db from "../db.js";
 import auth from "../middleware/auth.js";
-import { awardEligibleBadges, getUserBadges } from "../utils/badges.js";
+import { awardEligibleBadges, getBadgeStatusList, getUserBadges } from "../utils/badges.js";
 import { buildAchievements, getLevelProgress } from "../utils/gamification.js";
 import { buildTrainingLocationQuery, geocodeTrainingLocation } from "../utils/location.js";
+import { getOnlineStatusMap } from "../utils/realtime.js";
+import { awardXP, XP_REWARDS } from "../utils/xpSystem.js";
 
 const router = express.Router();
 
@@ -83,6 +85,7 @@ function buildProfilePayload(user, options = {}) {
     ...normalizePublicUser(user),
     checkedInToday,
     badges: getUserBadges(user.id),
+    availableBadges: getBadgeStatusList(user.id),
     achievements,
     levelProgress: progress,
     stats: metrics,
@@ -150,9 +153,22 @@ router.get("/me", auth, (req, res) => {
 router.get("/me/badges", auth, (req, res) => {
   try {
     awardEligibleBadges(req.user.id);
-    res.json(getUserBadges(req.user.id));
+    res.json(getBadgeStatusList(req.user.id));
   } catch {
     res.status(500).json({ error: "Failed to load badges" });
+  }
+});
+
+router.get("/online-status", auth, (req, res) => {
+  try {
+    const ids = String(req.query.ids ?? "")
+      .split(",")
+      .map((value) => Number(value.trim()))
+      .filter(Number.isInteger);
+
+    res.json(getOnlineStatusMap(ids));
+  } catch {
+    res.status(500).json({ error: "Failed to load online status" });
   }
 });
 
@@ -247,6 +263,12 @@ router.post("/profile", auth, async (req, res) => {
       trainingLocationQuery ||
       null;
 
+    const existingUser = db.prepare(`
+      SELECT age, gym, goal, experience, preferredTime, city
+      FROM users
+      WHERE id = ?
+    `).get(req.user.id);
+
     db.prepare(`
       UPDATE users
       SET age = ?,
@@ -275,6 +297,19 @@ router.post("/profile", auth, async (req, res) => {
       geocodedLocation?.locationLng ?? null,
       req.user.id
     );
+
+    const profileWasComplete = Boolean(
+      existingUser?.age &&
+      existingUser?.gym &&
+      existingUser?.goal &&
+      existingUser?.experience &&
+      existingUser?.preferredTime &&
+      existingUser?.city
+    );
+
+    if (!profileWasComplete) {
+      awardXP(req.user.id, XP_REWARDS.complete_profile, "complete_profile");
+    }
 
     res.json({ success: true });
   } catch {
