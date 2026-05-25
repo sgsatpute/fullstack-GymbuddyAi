@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development node server/index.js",
     "build": "tsx script/build.ts",
-    "start": "cross-env NODE_ENV=production node dist/index.cjs",
+    "start": "node dist/index.cjs",
     "check": "tsc -p client/tsconfig.json --noEmit",
     "typecheck": "npm run check",
     "ci:check": "npm run check && npm run build",

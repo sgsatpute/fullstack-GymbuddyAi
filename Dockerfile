@@ -46,4 +46,4 @@ COPY --from=build /opt/venv /opt/venv
 
 EXPOSE 5001
 
-CMD ["npm", "start"]
+CMD ["node", "dist/index.cjs"]
