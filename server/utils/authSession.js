@@ -48,7 +48,7 @@ function createRefreshToken() {
 function getRefreshCookieOptions() {
   return {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: config.refreshCookieSameSite,
     secure: config.isProduction,
     path: "/api/auth",
     maxAge: config.refreshTokenDays * 24 * 60 * 60 * 1000,

@@ -17,6 +17,13 @@ function requireEnv(name) {
   return value;
 }
 
+function parseCsv(value) {
+  return (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 function resolveDbPath(dbPath) {
   if (!dbPath) {
     return path.resolve(projectRoot, "server", "gymbuddy.db");
@@ -38,6 +45,8 @@ const config = {
   accessTokenTtl: process.env.ACCESS_TOKEN_TTL ?? "15m",
   refreshTokenDays: parsePositiveInt(process.env.REFRESH_TOKEN_DAYS, 7),
   refreshCookieName: "gymbuddy_refresh",
+  refreshCookieSameSite: process.env.REFRESH_COOKIE_SAMESITE ?? "lax",
+  corsOrigins: parseCsv(process.env.CORS_ORIGIN ?? process.env.CLIENT_ORIGIN),
   passwordResetOtpTtlMinutes: parsePositiveInt(
     process.env.PASSWORD_RESET_OTP_TTL_MINUTES,
     10

@@ -1,12 +1,14 @@
 import { io } from "socket.io-client";
 import { getStoredToken } from "../utils/auth";
+import { getSocketUrl } from "../utils/runtime";
 
-export const socket = io("/", {
+export const socket = io(getSocketUrl(), {
   autoConnect: false,
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 500,
   reconnectionDelayMax: 8000,
+  withCredentials: true,
   auth: (callback) => {
     callback({ token: getStoredToken() });
   },

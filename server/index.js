@@ -37,8 +37,30 @@ import {
 
 const app = express();
 const server = http.createServer(app);
+
+function isOriginAllowed(origin) {
+  if (!origin) {
+    return true;
+  }
+
+  if (config.corsOrigins.includes(origin)) {
+    return true;
+  }
+
+  if (!config.isProduction && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+    return true;
+  }
+
+  return false;
+}
+
 const io = new Server(server, {
-  cors: { origin: "*" },
+  cors: {
+    origin(origin, callback) {
+      callback(null, isOriginAllowed(origin));
+    },
+    credentials: true,
+  },
 });
 
 const productionClientDir = path.resolve(process.cwd(), "dist", "public");
@@ -84,6 +106,24 @@ function scheduleTypingStop(from, to) {
 }
 
 app.use(cookieParser());
+app.use((req, res, next) => {
+  const origin = req.get("origin");
+
+  if (origin && isOriginAllowed(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  }
+
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+
+  next();
+});
 app.use(express.json());
 app.use(requestLogger);
 app.use("/api", apiLimiter);
