@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Avatar from "./Avatar";
 import { apiFetch } from "../utils/api";
 import { ConversationSummary } from "../utils/models";
 import { formatDateTime, formatExperience, formatGoal } from "../utils/display";
@@ -54,11 +55,14 @@ export default function Inbox() {
           {conversations.map((conversation) => (
             <article key={conversation.userId} className="card conversation-card">
               <div className="conversation-top">
-                <div>
-                  <h3>{conversation.user.name}</h3>
-                  <p className="muted">
-                    {formatGoal(conversation.user.goal)} · {formatExperience(conversation.user.experience)}
-                  </p>
+                <div className="match-headline">
+                  <Avatar name={conversation.user.name} avatarUrl={conversation.user.avatarUrl} size="md" />
+                  <div>
+                    <h3>{conversation.user.name}</h3>
+                    <p className="muted">
+                      {formatGoal(conversation.user.goal)} · {formatExperience(conversation.user.experience)}
+                    </p>
+                  </div>
                 </div>
                 <div className="conversation-meta">
                   <span className="muted">{formatDateTime(conversation.lastMessageAt)}</span>

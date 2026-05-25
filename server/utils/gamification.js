@@ -1,14 +1,25 @@
 export function getLevelProgress(xp = 0) {
   const normalizedXp = Number.isFinite(xp) ? Math.max(0, xp) : 0;
-  const level = Math.floor(normalizedXp / 100) + 1;
-  const levelStartXp = (level - 1) * 100;
-  const nextLevelXp = level * 100;
+  const levels = [
+    { level: 1, title: "Gym Newbie", minXp: 0, maxXp: 499 },
+    { level: 2, title: "Regular", minXp: 500, maxXp: 1499 },
+    { level: 3, title: "Dedicated", minXp: 1500, maxXp: 3499 },
+    { level: 4, title: "Athlete", minXp: 3500, maxXp: 6999 },
+    { level: 5, title: "Elite", minXp: 7000, maxXp: 14999 },
+    { level: 6, title: "Legend", minXp: 15000, maxXp: Number.MAX_SAFE_INTEGER },
+  ];
+  const currentLevel = levels.findLast((item) => normalizedXp >= item.minXp) ?? levels[0];
+  const nextLevel = levels.find((item) => item.level === currentLevel.level + 1) ?? null;
+  const levelStartXp = currentLevel.minXp;
+  const nextLevelXp = nextLevel?.minXp ?? currentLevel.maxXp;
   const xpIntoLevel = normalizedXp - levelStartXp;
-  const xpNeededForNextLevel = Math.max(0, nextLevelXp - normalizedXp);
-  const levelProgressPercent = Math.min(100, Math.round((xpIntoLevel / 100) * 100));
+  const span = nextLevel ? nextLevel.minXp - levelStartXp : Math.max(1, currentLevel.maxXp - levelStartXp + 1);
+  const xpNeededForNextLevel = nextLevel ? Math.max(0, nextLevel.minXp - normalizedXp) : 0;
+  const levelProgressPercent = nextLevel ? Math.min(100, Math.round((xpIntoLevel / span) * 100)) : 100;
 
   return {
-    level,
+    level: currentLevel.level,
+    title: currentLevel.title,
     levelStartXp,
     nextLevelXp,
     xpIntoLevel,

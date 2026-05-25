@@ -1,7 +1,11 @@
 import express from "express";
 import db from "../db.js";
 import auth from "../middleware/auth.js";
+import { awardEligibleBadges, getBadgeStatusList, getUserBadges } from "../utils/badges.js";
 import { buildAchievements, getLevelProgress } from "../utils/gamification.js";
+import { buildTrainingLocationQuery, geocodeTrainingLocation } from "../utils/location.js";
+import { getOnlineStatusMap } from "../utils/realtime.js";
+import { awardXP, XP_REWARDS } from "../utils/xpSystem.js";
 
 const router = express.Router();
 
@@ -23,8 +27,15 @@ function normalizePublicUser(user) {
     xp: user.xp ?? 0,
     level: user.level ?? 1,
     bio: user.bio ?? "",
+    avatarUrl: user.avatarUrl ?? null,
+    city: user.city ?? "",
+    locationLabel: user.locationLabel ?? "",
+    locationPlaceId: user.locationPlaceId ?? null,
+    locationLat: user.locationLat ?? null,
+    locationLng: user.locationLng ?? null,
     createdAt: user.createdAt,
     lastCheckIn: user.lastCheckIn,
+    lastCheckinTime: user.lastCheckinTime ?? null,
   };
 }
 
@@ -73,6 +84,8 @@ function buildProfilePayload(user, options = {}) {
   return {
     ...normalizePublicUser(user),
     checkedInToday,
+    badges: getUserBadges(user.id),
+    availableBadges: getBadgeStatusList(user.id),
     achievements,
     levelProgress: progress,
     stats: metrics,
@@ -86,6 +99,8 @@ function buildProfilePayload(user, options = {}) {
 }
 
 router.get("/me", auth, (req, res) => {
+  awardEligibleBadges(req.user.id);
+
   const user = db.prepare(`
     SELECT
       id,
@@ -101,8 +116,15 @@ router.get("/me", auth, (req, res) => {
       xp,
       level,
       bio,
+      avatarUrl,
+      city,
+      locationLabel,
+      locationPlaceId,
+      locationLat,
+      locationLng,
       createdAt,
-      lastCheckIn
+      lastCheckIn,
+      lastCheckinTime
     FROM users
     WHERE id = ?
   `).get(req.user.id);
@@ -116,7 +138,8 @@ router.get("/me", auth, (req, res) => {
       user.gym &&
       user.goal &&
       user.experience &&
-      user.preferredTime
+      user.preferredTime &&
+      user.city
   );
 
   res.json(
@@ -125,6 +148,28 @@ router.get("/me", auth, (req, res) => {
       profileComplete,
     })
   );
+});
+
+router.get("/me/badges", auth, (req, res) => {
+  try {
+    awardEligibleBadges(req.user.id);
+    res.json(getBadgeStatusList(req.user.id));
+  } catch {
+    res.status(500).json({ error: "Failed to load badges" });
+  }
+});
+
+router.get("/online-status", auth, (req, res) => {
+  try {
+    const ids = String(req.query.ids ?? "")
+      .split(",")
+      .map((value) => Number(value.trim()))
+      .filter(Number.isInteger);
+
+    res.json(getOnlineStatusMap(ids));
+  } catch {
+    res.status(500).json({ error: "Failed to load online status" });
+  }
 });
 
 router.get("/:id", auth, (req, res) => {
@@ -148,8 +193,15 @@ router.get("/:id", auth, (req, res) => {
       xp,
       level,
       bio,
+      avatarUrl,
+      city,
+      locationLabel,
+      locationPlaceId,
+      locationLat,
+      locationLng,
       createdAt,
-      lastCheckIn
+      lastCheckIn,
+      lastCheckinTime
     FROM users
     WHERE id = ?
   `).get(userId);
@@ -188,33 +240,81 @@ router.get("/:id", auth, (req, res) => {
   });
 });
 
-router.post("/profile", auth, (req, res) => {
-  const { age, gym, goal, experience, preferredTime, bio } = req.body;
+router.post("/profile", auth, async (req, res) => {
+  try {
+    const { age, gym, goal, experience, preferredTime, bio, city, locationLabel } = req.body;
 
-  if (!age || !gym || !goal || !experience || !preferredTime) {
-    return res.status(400).json({ error: "All profile fields required" });
+    if (!age || !gym || !goal || !experience || !preferredTime || !city) {
+      return res.status(400).json({ error: "All profile fields required" });
+    }
+
+    const normalizedGym = String(gym).trim();
+    const normalizedCity = String(city).trim();
+    const normalizedLocationLabel = String(locationLabel ?? "").trim();
+    const trainingLocationQuery = buildTrainingLocationQuery({
+      locationLabel: normalizedLocationLabel,
+      gym: normalizedGym,
+      city: normalizedCity,
+    });
+    const geocodedLocation = await geocodeTrainingLocation(trainingLocationQuery);
+    const storedLocationLabel =
+      geocodedLocation?.locationLabel ||
+      normalizedLocationLabel ||
+      trainingLocationQuery ||
+      null;
+
+    const existingUser = db.prepare(`
+      SELECT age, gym, goal, experience, preferredTime, city
+      FROM users
+      WHERE id = ?
+    `).get(req.user.id);
+
+    db.prepare(`
+      UPDATE users
+      SET age = ?,
+          gym = ?,
+          goal = ?,
+          experience = ?,
+          preferredTime = ?,
+          bio = ?,
+          city = ?,
+          locationLabel = ?,
+          locationPlaceId = ?,
+          locationLat = ?,
+          locationLng = ?
+      WHERE id = ?
+    `).run(
+      age,
+      normalizedGym,
+      String(goal).trim(),
+      String(experience).trim(),
+      String(preferredTime).trim(),
+      String(bio ?? "").trim(),
+      normalizedCity,
+      storedLocationLabel,
+      geocodedLocation?.locationPlaceId ?? null,
+      geocodedLocation?.locationLat ?? null,
+      geocodedLocation?.locationLng ?? null,
+      req.user.id
+    );
+
+    const profileWasComplete = Boolean(
+      existingUser?.age &&
+      existingUser?.gym &&
+      existingUser?.goal &&
+      existingUser?.experience &&
+      existingUser?.preferredTime &&
+      existingUser?.city
+    );
+
+    if (!profileWasComplete) {
+      awardXP(req.user.id, XP_REWARDS.complete_profile, "complete_profile");
+    }
+
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Failed to save profile" });
   }
-
-  db.prepare(`
-    UPDATE users
-    SET age = ?,
-        gym = ?,
-        goal = ?,
-        experience = ?,
-        preferredTime = ?,
-        bio = ?
-    WHERE id = ?
-  `).run(
-    age,
-    String(gym).trim(),
-    String(goal).trim(),
-    String(experience).trim(),
-    String(preferredTime).trim(),
-    String(bio ?? "").trim(),
-    req.user.id
-  );
-
-  res.json({ success: true });
 });
 
 export default router;

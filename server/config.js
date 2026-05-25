@@ -68,6 +68,9 @@ const config = {
   smtpUser: process.env.SMTP_USER ?? "",
   smtpPass: process.env.SMTP_PASS ?? "",
   smtpFrom: process.env.SMTP_FROM ?? "GymBuddy AI <no-reply@gymbuddy.ai>",
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
+  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
+  googleMapsRegion: process.env.GOOGLE_MAPS_REGION ?? "IN",
 };
 
 export default config;
