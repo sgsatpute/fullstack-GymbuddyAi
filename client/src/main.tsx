@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from './App'
 import { GamificationProvider } from "./hooks/useGamification";
+import { isRemoteApiUrl, resolveApiUrl } from "./utils/runtime";
 import './index.css'
 
 const queryClient = new QueryClient();
@@ -10,8 +11,16 @@ const queryClient = new QueryClient();
 // Adapt the new backend standard JSON API envelopes to legacy client expectations
 const originalFetch = window.fetch;
 window.fetch = async function (...args) {
-  const response = await originalFetch(...args);
-  const url = typeof args[0] === 'string' ? args[0] : (args[0] as any).url;
+  const input = args[0];
+  const init = args[1];
+  const originalUrl = typeof input === 'string' ? input : (input as Request).url;
+  const resolvedUrl = typeof originalUrl === "string" ? resolveApiUrl(originalUrl) : originalUrl;
+  const nextInit = isRemoteApiUrl(resolvedUrl)
+    ? { ...init, credentials: "include" as RequestCredentials }
+    : init;
+  const nextInput = typeof input === "string" ? resolvedUrl : input;
+  const response = await originalFetch(nextInput, nextInit);
+  const url = resolvedUrl;
 
   if (url && url.includes('/api/')) {
     const contentType = response.headers.get("content-type");
