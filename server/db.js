@@ -269,7 +269,6 @@ db.exec(`
 `);
 
 db.exec(`
-<<<<<<< HEAD
   CREATE TABLE IF NOT EXISTS match_interactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     viewerId INTEGER NOT NULL,
@@ -380,6 +379,10 @@ db.exec(`
   )
 `);
 
+ensureColumns("group_challenges", {
+  weeklyReset: "weeklyReset INTEGER DEFAULT 0",
+});
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -394,6 +397,10 @@ db.exec(`
     FOREIGN KEY (userId) REFERENCES users(id)
   )
 `);
+
+ensureColumns("notifications", {
+  data: "data TEXT",
+});
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS streak_freezes (
@@ -438,12 +445,5 @@ createIndexes([
 ]);
 
 console.log("Database ready for GymBuddy AI.");
-=======
-  CREATE INDEX IF NOT EXISTS idx_password_reset_otps_user_id
-  ON password_reset_otps(userId)
-`);
-
-console.log("Database ready (users, chat, ML, workouts, sessions, password reset, safety)");
->>>>>>> 9706039a9576f90121c27ed762b208134181dce5
 
 export default db;

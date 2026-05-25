@@ -226,23 +226,30 @@ router.get("/checkin/body-metrics/history", auth, (req, res) => {
 
 router.get("/checkin/body-metrics/progress", auth, progressAnalysisLimiter, async (req, res) => {
   try {
-    const entries = db.prepare(`
+    const firstEntry = db.prepare(`
       SELECT *
       FROM body_metrics
       WHERE userId = ?
       ORDER BY loggedAt ASC, id ASC
-    `).all(req.user.id);
+      LIMIT 1
+    `).get(req.user.id);
 
-    if (entries.length < 2) {
+    const latestEntry = db.prepare(`
+      SELECT *
+      FROM body_metrics
+      WHERE userId = ?
+      ORDER BY loggedAt DESC, id DESC
+      LIMIT 1
+    `).get(req.user.id);
+
+    if (!firstEntry || !latestEntry || firstEntry.id === latestEntry.id) {
       return res.json({
         summary: "Log at least two body metric entries to unlock progress analysis.",
-        firstEntry: entries[0] ?? null,
-        latestEntry: entries[entries.length - 1] ?? null,
+        firstEntry: firstEntry ?? null,
+        latestEntry: latestEntry ?? null,
       });
     }
 
-    const firstEntry = entries[0];
-    const latestEntry = entries[entries.length - 1];
     const context = buildUserContext(req.user.id);
 
     const fallbackSummary = `${context.userProfile.name} moved from ${firstEntry.weight} kg to ${latestEntry.weight} kg. Keep watching weekly trend lines instead of day-to-day noise.`;

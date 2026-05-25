@@ -5,6 +5,8 @@ import App from './App'
 import { GamificationProvider } from "./hooks/useGamification";
 import './index.css'
 
+const queryClient = new QueryClient();
+
 // Adapt the new backend standard JSON API envelopes to legacy client expectations
 const originalFetch = window.fetch;
 window.fetch = async function (...args) {
@@ -44,7 +46,7 @@ ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 ).render(
   <React.StrictMode>
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={queryClient}>
       <GamificationProvider>
         <App />
       </GamificationProvider>

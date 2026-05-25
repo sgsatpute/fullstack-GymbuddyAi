@@ -200,41 +200,38 @@ router.get("/:id/feed", auth, (req, res) => {
     const memberIds = getGroupMemberIds(groupId);
     const placeholders = memberIds.map(() => "?").join(", ");
 
-    const workoutFeed = memberIds.length
+    const combined = memberIds.length
       ? db.prepare(`
-          SELECT
-            ws.id,
-            ws.userId,
-            u.name,
-            'workout' AS type,
-            ws.focusArea AS title,
-            ws.workoutType AS detail,
-            ws.createdAt
-          FROM workout_sessions ws
-          JOIN users u ON u.id = ws.userId
-          WHERE ws.userId IN (${placeholders})
-        `).all(...memberIds)
+          SELECT *
+          FROM (
+            SELECT
+              ws.id,
+              ws.userId,
+              u.name,
+              'workout' AS type,
+              ws.focusArea AS title,
+              ws.workoutType AS detail,
+              ws.createdAt
+            FROM workout_sessions ws
+            JOIN users u ON u.id = ws.userId
+            WHERE ws.userId IN (${placeholders})
+            UNION ALL
+            SELECT
+              al.id,
+              al.userId,
+              u.name,
+              al.actionType AS type,
+              al.actionType AS title,
+              al.metadata AS detail,
+              al.createdAt
+            FROM activity_log al
+            JOIN users u ON u.id = al.userId
+            WHERE al.userId IN (${placeholders})
+          )
+          ORDER BY datetime(createdAt) DESC, id DESC
+          LIMIT ? OFFSET ?
+        `).all(...memberIds, ...memberIds, pageSize, offset)
       : [];
-
-    const activityFeed = memberIds.length
-      ? db.prepare(`
-          SELECT
-            al.id,
-            al.userId,
-            u.name,
-            al.actionType AS type,
-            al.actionType AS title,
-            al.metadata AS detail,
-            al.createdAt
-          FROM activity_log al
-          JOIN users u ON u.id = al.userId
-          WHERE al.userId IN (${placeholders})
-        `).all(...memberIds)
-      : [];
-
-    const combined = [...workoutFeed, ...activityFeed]
-      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
-      .slice(offset, offset + pageSize);
 
     return res.json({
       page,

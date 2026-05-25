@@ -1,4 +1,4 @@
-/* SINGLE SOURCE OF TRUTH - all component classes defined here. */
+/* SINGLE SOURCE OF TRUTH — all component classes defined here. */
 /* Do NOT duplicate in tailwind.config.js plugins. */
 @tailwind base;
 @tailwind components;

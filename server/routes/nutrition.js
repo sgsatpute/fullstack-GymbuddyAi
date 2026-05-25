@@ -28,11 +28,14 @@ import {
   normalizeMealEntry,
 } from "../utils/nutrition.js";
 import { toLocalDateString } from "../utils/fitness.js";
+import { getCachedValue, setCachedValue } from "../utils/ttlCache.js";
 
 const router = express.Router();
 const foodUploadsDir = path.resolve(process.cwd(), "server", "uploads", "foods");
 const searchCache = new Map();
 const insightsCache = new Map();
+const SEARCH_CACHE_TTL_MS = 60 * 60 * 1000;
+const INSIGHTS_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 fs.mkdirSync(foodUploadsDir, { recursive: true });
 
@@ -90,9 +93,9 @@ function sanitizeQuery(value) {
 
 async function searchOpenFoodFacts(query) {
   const cacheKey = sanitizeQuery(query);
-  const cached = searchCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.results;
+  const cached = getCachedValue(searchCache, cacheKey);
+  if (cached) {
+    return cached;
   }
 
   const url =
@@ -132,10 +135,7 @@ async function searchOpenFoodFacts(query) {
         .filter((product) => product.name)
     : [];
 
-  searchCache.set(cacheKey, {
-    results,
-    expiresAt: Date.now() + 60 * 60 * 1000,
-  });
+  setCachedValue(searchCache, cacheKey, results, SEARCH_CACHE_TTL_MS);
 
   return results;
 }
@@ -322,9 +322,9 @@ router.get("/history", auth, (req, res) => {
 router.get("/weekly-insights", auth, progressAnalysisLimiter, async (req, res) => {
   try {
     const cacheKey = `nutrition-insights:${req.user.id}`;
-    const cached = insightsCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      return res.json(cached.payload);
+    const cached = getCachedValue(insightsCache, cacheKey);
+    if (cached) {
+      return res.json(cached);
     }
 
     const entries = getNutritionHistory(req.user.id, 7).reverse();
@@ -335,10 +335,7 @@ router.get("/weekly-insights", auth, progressAnalysisLimiter, async (req, res) =
     `).get(req.user.id);
 
     const payload = await analyzeNutritionPattern(entries, user?.goal ?? "fitness");
-    insightsCache.set(cacheKey, {
-      payload,
-      expiresAt: Date.now() + 6 * 60 * 60 * 1000,
-    });
+    setCachedValue(insightsCache, cacheKey, payload, INSIGHTS_CACHE_TTL_MS);
 
     return res.json(payload);
   } catch {

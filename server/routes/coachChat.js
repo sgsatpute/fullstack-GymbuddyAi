@@ -4,9 +4,11 @@ import db from "../db.js";
 import auth from "../middleware/auth.js";
 import { buildUserContext } from "../utils/coachMemory.js";
 import { coachMessageLimiter, progressAnalysisLimiter } from "../middleware/rateLimit.js";
+import { getCachedValue, setCachedValue } from "../utils/ttlCache.js";
 
 const router = express.Router();
 const insightsCache = new Map();
+const INSIGHTS_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 function estimateTokens(text) {
   return Math.max(1, Math.round(String(text ?? "").length / 4));
@@ -211,9 +213,9 @@ router.post("/daily-checkin", auth, async (req, res) => {
 router.get("/insights", auth, progressAnalysisLimiter, async (req, res) => {
   try {
     const cacheKey = `coach-insights:${req.user.id}`;
-    const cached = insightsCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      return res.json(cached.payload);
+    const cached = getCachedValue(insightsCache, cacheKey);
+    if (cached) {
+      return res.json(cached);
     }
 
     const context = buildUserContext(req.user.id);
@@ -224,10 +226,7 @@ router.get("/insights", auth, progressAnalysisLimiter, async (req, res) => {
       readinessScore: context.summary.readinessScore,
     });
 
-    insightsCache.set(cacheKey, {
-      payload,
-      expiresAt: Date.now() + 6 * 60 * 60 * 1000,
-    });
+    setCachedValue(insightsCache, cacheKey, payload, INSIGHTS_CACHE_TTL_MS);
 
     return res.json(payload);
   } catch {

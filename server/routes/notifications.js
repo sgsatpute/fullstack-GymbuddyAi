@@ -7,9 +7,9 @@ const router = express.Router();
 router.get("/", auth, (req, res) => {
   try {
     const notifications = db.prepare(`
-      SELECT id, type, title, body, link, read, createdAt
+      SELECT id, type, title, body, link, data, read, createdAt
       FROM notifications
-      WHERE userId = ?
+      WHERE userId = ? AND COALESCE(read, 0) = 0
       ORDER BY datetime(createdAt) DESC, id DESC
       LIMIT 50
     `).all(req.user.id);

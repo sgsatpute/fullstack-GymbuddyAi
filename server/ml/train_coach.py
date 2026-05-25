@@ -211,7 +211,7 @@ def train():
     print(f"Samples: {len(data)}")
     print(f"Train/Test Split: 80/20")
     print(f"Accuracy: {accuracy:.4f}")
-    print(f"5-Fold Cross-Validation: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
+    print(f"5-Fold Cross-Validation: {cv_scores.mean():.4f} +/- {cv_scores.std():.4f}")
     print("\nClassification Report")
     print(report)
     print("Confusion Matrix")

@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { beforeEach } from "vitest";
 
 // 1. Initialize environment variables BEFORE importing db or app
 process.env.NODE_ENV = "test";
@@ -15,9 +16,8 @@ if (fs.existsSync(dbPath)) {
   }
 }
 
-// 2. Import db to ensure tables are initialized
-import db from "../server/db.js";
-import { beforeEach } from "vitest";
+// 2. Import db after env setup so server/config.js sees test values.
+const { default: db } = await import("../server/db.js");
 
 // 3. Clear all tables before each test case
 beforeEach(() => {
@@ -31,10 +31,22 @@ beforeEach(() => {
     "workout_sessions",
     "meal_entries",
     "badges",
+    "user_badges",
+    "user_xp_log",
     "activity_log",
     "blocks",
     "refresh_tokens",
-    "password_reset_otps"
+    "password_reset_otps",
+    "match_interactions",
+    "workout_plans",
+    "daily_checkins",
+    "body_metrics",
+    "group_messages",
+    "group_challenges",
+    "group_members",
+    "groups",
+    "notifications",
+    "streak_freezes",
   ];
 
   db.exec("PRAGMA foreign_keys = OFF;");
