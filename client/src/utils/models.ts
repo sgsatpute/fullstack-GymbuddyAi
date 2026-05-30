@@ -219,9 +219,12 @@ export type UserProfile = {
 export type MatchItem = {
   user: UserProfile;
   score: number;
-  reasons: string[];
-  tier: string;
+  reasons?: string[];
+  compatibilityReasons?: string[];
+  tier?: string;
+  matchLabel?: string;
   canChat: boolean;
+  breakdown?: Record<string, number>;
   distanceKm?: number | null;
   locationInsight?: string;
   mapsUrl?: string | null;

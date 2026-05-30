@@ -98,6 +98,11 @@ export default function Dashboard() {
     () => (user?.achievements ?? []).slice(0, 4),
     [user]
   );
+  const levelProgress = user?.levelProgress;
+  const levelTargetXp =
+    levelProgress && levelProgress.nextLevelXp > levelProgress.levelStartXp
+      ? levelProgress.nextLevelXp - levelProgress.levelStartXp
+      : 100;
   const workoutSummary = workoutOverview?.summary;
   const recentWorkouts = workoutOverview?.recentWorkouts ?? [];
 
@@ -282,14 +287,14 @@ export default function Dashboard() {
       <section className="stats-grid">
         <div className="card stat-card">
           <span className="eyebrow">Level progress</span>
-          <strong>{user.levelProgress?.xpIntoLevel ?? 0} / 100 XP</strong>
+          <strong>{levelProgress?.xpIntoLevel ?? 0} / {levelTargetXp} XP</strong>
           <div className="progress">
             <div
               className="progress-fill"
-              style={{ width: `${user.levelProgress?.levelProgressPercent ?? 0}%` }}
+              style={{ width: `${levelProgress?.levelProgressPercent ?? 0}%` }}
             />
           </div>
-          <p>{user.levelProgress?.xpNeededForNextLevel ?? 0} XP to next level</p>
+          <p>{levelProgress?.xpNeededForNextLevel ?? 0} XP to next level</p>
         </div>
         <div className="card stat-card">
           <span className="eyebrow">Conversations</span>
