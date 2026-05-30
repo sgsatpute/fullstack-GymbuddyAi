@@ -1,11 +1,34 @@
 import { useEffect, useState } from "react";
-import { Bot, ChevronDown, LayoutDashboard, LogOut, Medal, User as UserIcon, Users, UtensilsCrossed } from "lucide-react";
+import {
+  Activity,
+  Bot,
+  ChevronDown,
+  LayoutDashboard,
+  LogOut,
+  Medal,
+  MessageCircle,
+  User as UserIcon,
+  Users,
+  UtensilsCrossed,
+} from "lucide-react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import Avatar from "./Avatar";
 import { logoutSession, hasStoredToken } from "../utils/auth";
 import { apiFetch } from "../utils/api";
 import { UserProfile } from "../utils/models";
 import NotificationCenter from "./ui/NotificationCenter";
+
+const accountLinks = [
+  { to: "/profile/me", label: "Profile", icon: UserIcon },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/matches", label: "Matches", icon: Users },
+  { to: "/inbox", label: "Inbox", icon: MessageCircle },
+  { to: "/coach", label: "Coach", icon: Bot },
+  { to: "/nutrition", label: "Nutrition", icon: UtensilsCrossed },
+  { to: "/groups", label: "Groups", icon: Users },
+  { to: "/body-progress", label: "Body Progress", icon: Activity },
+  { to: "/leaderboard", label: "Leaderboard", icon: Medal },
+];
 
 export default function TopBar() {
   const navigate = useNavigate();
@@ -33,24 +56,43 @@ export default function TopBar() {
 
   return (
     <>
-    <header className="topbar-mobile">
-      <Link to="/dashboard" className="flex items-center gap-3">
-        <div className="mobile-brand-mark">
-          <Bot size={18} />
-        </div>
-        <div>
-          <div className="font-semibold text-white">GymBuddy AI</div>
-          <div className="tiny-muted">Social fitness coach</div>
-        </div>
-      </Link>
-
-      <div className="flex items-center gap-2">
-        <NotificationCenter />
-        <Link to="/profile/me">
-          <Avatar name={user?.name} avatarUrl={user?.avatarUrl} size="sm" />
+      <header className="topbar-mobile">
+        <Link to="/dashboard" className="flex items-center gap-3">
+          <div className="mobile-brand-mark">
+            <Bot size={18} />
+          </div>
+          <div>
+            <div className="font-semibold text-white">GymBuddy AI</div>
+            <div className="tiny-muted">Social fitness coach</div>
+          </div>
         </Link>
-      </div>
-    </header>
+
+        <div className="flex items-center gap-2">
+          <NotificationCenter />
+          <details className="relative">
+            <summary className="mobile-profile-trigger">
+              <Avatar name={user?.name} avatarUrl={user?.avatarUrl} size="sm" />
+              <ChevronDown size={14} />
+            </summary>
+
+            <div className="account-menu mobile-account-menu">
+              {accountLinks.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link key={item.to} to={item.to} className="account-menu-link">
+                    <Icon size={16} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+              <button onClick={handleLogout} className="account-menu-link danger" type="button">
+                <LogOut size={16} />
+                Logout
+              </button>
+            </div>
+          </details>
+        </div>
+      </header>
 
     <header className="topbar-desktop">
       <Link to="/dashboard" className="flex items-center gap-3 font-semibold text-white">
@@ -84,36 +126,23 @@ export default function TopBar() {
       <div className="flex items-center gap-2">
         <NotificationCenter />
         <details className="relative">
-          <summary className="list-none">
-            <button className="btn-ghost flex items-center gap-3">
-              <Avatar name={user?.name} avatarUrl={user?.avatarUrl} size="sm" />
-              <span>{user?.name ?? "Profile"}</span>
-              <ChevronDown size={16} />
-            </button>
+          <summary className="topbar-profile-trigger">
+            <Avatar name={user?.name} avatarUrl={user?.avatarUrl} size="sm" />
+            <span>{user?.name ?? "Profile"}</span>
+            <ChevronDown size={16} />
           </summary>
 
-          <div className="absolute right-0 top-14 w-56 rounded-2xl border border-theme bg-surface p-2 shadow-2xl">
-            <Link to="/profile/me" className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white hover:bg-white/5">
-              <UserIcon size={16} />
-              Profile
-            </Link>
-            <Link to="/dashboard" className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white hover:bg-white/5">
-              <LayoutDashboard size={16} />
-              Dashboard
-            </Link>
-            <Link to="/matches" className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white hover:bg-white/5">
-              <Users size={16} />
-              Matches
-            </Link>
-            <Link to="/nutrition" className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white hover:bg-white/5">
-              <UtensilsCrossed size={16} />
-              Nutrition
-            </Link>
-            <Link to="/leaderboard" className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white hover:bg-white/5">
-              <Medal size={16} />
-              Leaderboard
-            </Link>
-            <button onClick={handleLogout} className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-red-300 hover:bg-red-500/10">
+          <div className="account-menu desktop-account-menu">
+            {accountLinks.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link key={item.to} to={item.to} className="account-menu-link">
+                  <Icon size={16} />
+                  {item.label}
+                </Link>
+              );
+            })}
+            <button onClick={handleLogout} className="account-menu-link danger" type="button">
               <LogOut size={16} />
               Logout
             </button>

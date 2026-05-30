@@ -456,6 +456,60 @@
     box-shadow: 0 14px 30px rgba(124, 110, 245, 0.22);
   }
 
+  .topbar-profile-trigger,
+  .mobile-profile-trigger {
+    @apply flex cursor-pointer list-none items-center gap-2 rounded-xl border transition-all;
+    border-color: var(--border);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .topbar-profile-trigger {
+    @apply px-4 py-2 text-sm font-medium text-white;
+  }
+
+  .mobile-profile-trigger {
+    @apply px-2 py-1.5;
+  }
+
+  .topbar-profile-trigger:hover,
+  .mobile-profile-trigger:hover {
+    border-color: rgba(124, 110, 245, 0.45);
+    transform: translateY(-1px);
+  }
+
+  .account-menu {
+    @apply absolute right-0 z-50 rounded-2xl border p-2 shadow-2xl;
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(19, 19, 26, 0.98);
+    backdrop-filter: blur(18px);
+  }
+
+  .desktop-account-menu {
+    @apply top-14 w-64;
+  }
+
+  .mobile-account-menu {
+    @apply top-12 w-64;
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+  }
+
+  .account-menu-link {
+    @apply flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-white transition-colors;
+  }
+
+  .account-menu-link:hover {
+    background: rgba(255, 255, 255, 0.055);
+  }
+
+  .account-menu-link.danger {
+    @apply mt-1 text-red-300;
+  }
+
+  .account-menu-link.danger:hover {
+    background: rgba(255, 107, 107, 0.1);
+  }
+
   .bottom-nav {
     @apply fixed bottom-3 left-3 right-3 z-50 flex h-16 items-center justify-around rounded-[1.35rem] border px-2 md:hidden;
     background: rgba(13, 13, 20, 0.86);
