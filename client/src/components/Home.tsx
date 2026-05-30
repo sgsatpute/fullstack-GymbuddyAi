@@ -21,8 +21,8 @@ const productHighlights = [
 export default function Home() {
   return (
     <PageWrapper>
-      <div className="page-grid">
-        <section className="hero-card relative overflow-hidden min-h-[72vh]">
+      <div className="page-grid landing-experience">
+        <section className="hero-card landing-hero relative overflow-hidden min-h-[72vh]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,212,170,0.14),transparent_25%)]" />
           <div className="relative grid gap-10 md:grid-cols-[1.1fr_0.9fr] md:items-center">
             <div className="space-y-6">

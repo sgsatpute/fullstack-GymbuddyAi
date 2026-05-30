@@ -34,7 +34,7 @@
       radial-gradient(circle at top right, rgba(0, 212, 170, 0.12), transparent 24%),
       var(--bg);
     color: var(--text);
-    font-family: "Inter", "Segoe UI", sans-serif;
+    font-family: "Space Grotesk", "Satoshi", "Aptos Display", "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     margin: 0;
   }
@@ -54,29 +54,35 @@
   input,
   select,
   textarea {
-    background: var(--bg3) !important;
-    border: 1px solid var(--border) !important;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+      var(--bg3) !important;
+    border: 1px solid rgba(255, 255, 255, 0.095) !important;
     color: var(--text) !important;
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 12px 16px;
     font-size: 14px;
     width: 100%;
     outline: none;
-    transition: border 0.2s;
+    transition: border 0.2s, box-shadow 0.2s, background 0.2s;
   }
 
   input:focus,
   select:focus,
   textarea:focus {
     border-color: var(--accent) !important;
+    box-shadow: 0 0 0 4px rgba(124, 110, 245, 0.12);
   }
 }
 
 @layer components {
   .card {
     @apply rounded-2xl border p-5;
-    background: var(--bg2);
-    border-color: var(--border);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+      var(--bg2);
+    border-color: rgba(255, 255, 255, 0.095);
+    box-shadow: 0 18px 52px rgba(0, 0, 0, 0.18);
   }
 
   .card-glass {
@@ -88,8 +94,10 @@
 
   .subtle-card {
     @apply rounded-2xl border p-4;
-    background: var(--bg3);
-    border-color: var(--border);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.018)),
+      var(--bg3);
+    border-color: rgba(255, 255, 255, 0.075);
   }
 
   .btn {
@@ -161,8 +169,20 @@
   }
 
   .stat-card {
-    background: var(--bg3);
-    @apply rounded-xl p-4 text-center;
+    @apply rounded-2xl p-4 text-left;
+    background:
+      radial-gradient(circle at top right, rgba(124, 110, 245, 0.1), transparent 34%),
+      rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.075);
+  }
+
+  .stat-card strong {
+    @apply mt-2 block text-3xl font-black tracking-[-0.05em];
+  }
+
+  .stat-card p {
+    @apply mt-2 text-sm leading-6;
+    color: rgba(255, 255, 255, 0.64);
   }
 
   .page-container {
@@ -216,9 +236,23 @@
   .hero-panel {
     @apply flex flex-col gap-6 rounded-3xl border p-6 md:flex-row md:items-center md:justify-between;
     background:
+      radial-gradient(circle at 14% 10%, rgba(124, 110, 245, 0.2), transparent 32%),
+      radial-gradient(circle at 86% 18%, rgba(0, 212, 170, 0.14), transparent 28%),
       linear-gradient(145deg, rgba(124, 110, 245, 0.12), rgba(19, 19, 26, 0.96)),
       var(--bg2);
-    border-color: rgba(124, 110, 245, 0.14);
+    border-color: rgba(124, 110, 245, 0.2);
+    box-shadow: 0 26px 90px rgba(0, 0, 0, 0.26);
+  }
+
+  .hero-panel h1,
+  .hero-card h1 {
+    @apply font-black tracking-[-0.045em];
+  }
+
+  .hero-panel p,
+  .hero-card p {
+    @apply leading-7;
+    color: rgba(255, 255, 255, 0.7);
   }
 
   .hero-profile {
@@ -226,7 +260,14 @@
   }
 
   .hero-actions {
-    @apply flex flex-col gap-3 sm:flex-row;
+    @apply flex flex-wrap gap-3;
+  }
+
+  .hero-actions .btn,
+  .hero-actions .btn-primary,
+  .hero-actions .btn-secondary {
+    @apply flex-1;
+    min-width: 10rem;
   }
 
   .hero-inline-actions {
@@ -312,6 +353,11 @@
     @apply flex flex-col gap-2;
   }
 
+  .field > span {
+    @apply text-sm font-semibold;
+    color: rgba(255, 255, 255, 0.84);
+  }
+
   .field-full {
     @apply md:col-span-2;
   }
@@ -375,7 +421,9 @@
   .achievement-item {
     @apply rounded-2xl border p-4;
     border-color: var(--border);
-    background: rgba(255, 255, 255, 0.03);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+      rgba(255, 255, 255, 0.03);
   }
 
   .achievement-unlocked {
@@ -435,9 +483,10 @@
   }
 
   .topbar-desktop {
-    @apply sticky top-0 z-40 hidden items-center justify-between border-b px-6 py-4 md:flex;
-    background: rgba(13, 13, 20, 0.92);
-    border-color: var(--border);
+    @apply sticky top-0 z-40 hidden items-center justify-between border-b px-6 py-3 md:flex;
+    background:
+      linear-gradient(180deg, rgba(13, 13, 20, 0.96), rgba(13, 13, 20, 0.82));
+    border-color: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(20px);
   }
 
@@ -512,19 +561,21 @@
 
   .bottom-nav {
     @apply fixed bottom-3 left-3 right-3 z-50 flex h-16 items-center justify-around rounded-[1.35rem] border px-2 md:hidden;
-    background: rgba(13, 13, 20, 0.86);
+    background:
+      linear-gradient(180deg, rgba(28, 28, 39, 0.92), rgba(10, 10, 15, 0.92));
     border-color: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(24px);
     box-shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
   }
 
   .nav-tab {
-    @apply relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors;
+    @apply relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl py-2 text-[10px] font-semibold transition-all;
     color: var(--muted);
   }
 
   .nav-tab.active {
-    color: var(--accent);
+    color: white;
+    background: rgba(124, 110, 245, 0.16);
   }
 
   .nav-tab.active svg {
@@ -532,8 +583,8 @@
   }
 
   .nav-dot {
-    @apply absolute -bottom-1 h-1.5 w-1.5 rounded-full;
-    background: var(--accent);
+    @apply absolute -bottom-0.5 h-1 w-5 rounded-full;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
   }
 
   .floating-avatar {
@@ -684,6 +735,237 @@
 
   .filter-rail::-webkit-scrollbar {
     display: none;
+  }
+
+  .auth-page {
+    @apply grid min-h-screen gap-6 px-4 py-8 md:grid-cols-[1fr_460px] md:items-center md:px-8;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(124, 110, 245, 0.24), transparent 32%),
+      radial-gradient(circle at 90% 18%, rgba(0, 212, 170, 0.16), transparent 28%),
+      var(--bg);
+  }
+
+  .auth-brand-panel {
+    @apply hidden rounded-[2rem] border p-8 md:block;
+    min-height: 560px;
+    border-color: rgba(255, 255, 255, 0.1);
+    background:
+      radial-gradient(circle at 28% 18%, rgba(124, 110, 245, 0.24), transparent 34%),
+      radial-gradient(circle at 76% 20%, rgba(0, 212, 170, 0.18), transparent 30%),
+      linear-gradient(145deg, rgba(28, 28, 39, 0.95), rgba(10, 10, 15, 0.98));
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.32);
+  }
+
+  .auth-brand-panel h1 {
+    @apply mt-6 max-w-3xl text-5xl font-black leading-tight tracking-[-0.055em];
+  }
+
+  .auth-brand-panel p {
+    @apply mt-5 max-w-2xl text-lg leading-8;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .auth-proof-grid {
+    @apply mt-10 grid max-w-xl grid-cols-2 gap-3;
+  }
+
+  .auth-proof-grid span {
+    @apply rounded-2xl border px-4 py-3 text-sm font-semibold;
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.055);
+  }
+
+  .auth-card {
+    @apply mx-auto flex w-full max-w-md flex-col gap-5 rounded-[2rem] border p-6 md:p-8;
+    border-color: rgba(255, 255, 255, 0.1);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025)),
+      var(--bg2);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+  }
+
+  .auth-card h1 {
+    @apply text-3xl font-black leading-tight tracking-[-0.045em];
+  }
+
+  .auth-switch {
+    @apply text-sm;
+    color: rgba(255, 255, 255, 0.68);
+  }
+
+  .text-link {
+    @apply font-semibold;
+    color: var(--accent2);
+  }
+
+  .landing-hero {
+    background:
+      radial-gradient(circle at 20% 20%, rgba(124, 110, 245, 0.28), transparent 34%),
+      radial-gradient(circle at 86% 16%, rgba(0, 212, 170, 0.2), transparent 28%),
+      linear-gradient(145deg, rgba(28, 28, 39, 0.98), rgba(10, 10, 15, 0.98));
+  }
+
+  .dashboard-hero {
+    border-color: rgba(0, 212, 170, 0.18);
+  }
+
+  .onboarding-hero {
+    border-color: rgba(0, 212, 170, 0.2);
+    background:
+      radial-gradient(circle at 12% 14%, rgba(0, 212, 170, 0.2), transparent 30%),
+      radial-gradient(circle at 84% 12%, rgba(124, 110, 245, 0.2), transparent 28%),
+      linear-gradient(145deg, rgba(28, 28, 39, 0.96), rgba(10, 10, 15, 0.98));
+  }
+
+  .profile-stepper {
+    @apply grid min-w-full gap-3 sm:min-w-[360px];
+  }
+
+  .step-card {
+    @apply flex items-center gap-3 rounded-2xl border px-4 py-3;
+    border-color: rgba(255, 255, 255, 0.09);
+    background: rgba(255, 255, 255, 0.045);
+  }
+
+  .step-card strong {
+    @apply flex h-9 w-9 items-center justify-center rounded-full text-sm;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .step-card span {
+    @apply text-sm font-semibold;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .step-card.active {
+    border-color: rgba(0, 212, 170, 0.22);
+    background: rgba(0, 212, 170, 0.085);
+  }
+
+  .step-card.active strong {
+    background: var(--accent2);
+    color: #03110e;
+  }
+
+  .dashboard-experience .stats-grid .stat-card:first-child,
+  .coach-experience .stats-grid .stat-card:first-child,
+  .nutrition-experience .stats-grid .stat-card:first-child {
+    border-color: rgba(0, 212, 170, 0.18);
+    background:
+      radial-gradient(circle at top right, rgba(0, 212, 170, 0.18), transparent 34%),
+      rgba(255, 255, 255, 0.05);
+  }
+
+  .nutrition-hero {
+    border-color: rgba(255, 169, 77, 0.2);
+    background:
+      radial-gradient(circle at 14% 10%, rgba(255, 169, 77, 0.18), transparent 32%),
+      radial-gradient(circle at 86% 18%, rgba(0, 212, 170, 0.13), transparent 28%),
+      linear-gradient(145deg, rgba(28, 28, 39, 0.96), rgba(10, 10, 15, 0.98));
+  }
+
+  .profile-hero {
+    border-color: rgba(124, 110, 245, 0.22);
+  }
+
+  .leaderboard-hero {
+    border-color: rgba(255, 169, 77, 0.22);
+    background:
+      radial-gradient(circle at 14% 10%, rgba(255, 169, 77, 0.18), transparent 32%),
+      radial-gradient(circle at 84% 18%, rgba(124, 110, 245, 0.18), transparent 28%),
+      linear-gradient(145deg, rgba(28, 28, 39, 0.96), rgba(10, 10, 15, 0.98));
+  }
+
+  .podium-grid {
+    @apply grid gap-4 md:grid-cols-3 md:items-end;
+  }
+
+  .podium-card {
+    @apply relative overflow-hidden rounded-[1.75rem] border p-5;
+    border-color: rgba(255, 255, 255, 0.1);
+    background:
+      radial-gradient(circle at top right, rgba(124, 110, 245, 0.16), transparent 34%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025)),
+      var(--bg2);
+  }
+
+  .podium-card.rank-1 {
+    @apply md:-translate-y-4;
+    border-color: rgba(255, 169, 77, 0.32);
+    background:
+      radial-gradient(circle at top right, rgba(255, 169, 77, 0.22), transparent 34%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.025)),
+      var(--bg2);
+  }
+
+  .podium-rank {
+    @apply inline-flex rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.2em];
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--warning);
+  }
+
+  .podium-card h2 {
+    @apply mt-4 text-2xl font-black tracking-[-0.04em];
+  }
+
+  .podium-card p {
+    @apply mt-1 text-lg font-semibold;
+    color: rgba(255, 255, 255, 0.78);
+  }
+
+  .leaderboard-list-head {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between;
+  }
+
+  .leaderboard-list-head h2 {
+    @apply text-2xl font-black tracking-[-0.04em];
+  }
+
+  .inbox-hero {
+    border-color: rgba(0, 212, 170, 0.18);
+    background:
+      radial-gradient(circle at 14% 10%, rgba(0, 212, 170, 0.18), transparent 32%),
+      radial-gradient(circle at 86% 18%, rgba(124, 110, 245, 0.18), transparent 28%),
+      linear-gradient(145deg, rgba(28, 28, 39, 0.96), rgba(10, 10, 15, 0.98));
+  }
+
+  .conversation-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .conversation-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: linear-gradient(180deg, var(--accent), var(--accent2));
+  }
+
+  .coach-experience .two-column,
+  .nutrition-experience .two-column,
+  .dashboard-experience .two-column {
+    @apply gap-5;
+  }
+
+  .coach-experience .card,
+  .nutrition-experience .card,
+  .dashboard-experience .card,
+  .profile-experience .card,
+  .leaderboard-experience .card,
+  .inbox-experience .card,
+  .onboarding-experience .card {
+    transition: border-color 0.2s ease, transform 0.2s ease;
+  }
+
+  .coach-experience .card:hover,
+  .nutrition-experience .card:hover,
+  .dashboard-experience .card:hover,
+  .profile-experience .card:hover,
+  .leaderboard-experience .card:hover,
+  .inbox-experience .card:hover,
+  .onboarding-experience .card:hover {
+    border-color: rgba(255, 255, 255, 0.16);
   }
 
   .match-deck-grid {

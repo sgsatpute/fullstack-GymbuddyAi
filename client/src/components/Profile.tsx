@@ -82,8 +82,8 @@ export default function Profile() {
       : null;
 
   return (
-    <div className="page-stack">
-      <section className="hero-panel">
+    <div className="page-stack profile-experience">
+      <section className="hero-panel profile-hero">
         <div className="hero-profile">
           <Avatar name={profile.name} avatarUrl={profile.avatarUrl} size="lg" />
           <div>

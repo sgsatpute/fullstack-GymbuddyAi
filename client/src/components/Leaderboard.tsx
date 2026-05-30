@@ -26,9 +26,12 @@ export default function Leaderboard() {
     return <div className="page-section">Loading leaderboard...</div>;
   }
 
+  const podium = data.leaders.slice(0, 3);
+  const rest = data.leaders.slice(3);
+
   return (
-    <div className="page-stack">
-      <section className="hero-panel">
+    <div className="page-stack leaderboard-experience">
+      <section className="hero-panel leaderboard-hero">
         <div>
           <span className="eyebrow">Leaderboard</span>
           <h1>Celebrate the people showing up consistently.</h1>
@@ -43,8 +46,32 @@ export default function Leaderboard() {
         )}
       </section>
 
+      {podium.length > 0 && (
+        <section className="podium-grid" aria-label="Top three leaderboard">
+          {podium.map((user) => (
+            <article key={user.id} className={`podium-card rank-${user.rank}`}>
+              <span className="podium-rank">#{user.rank}</span>
+              <h2>{user.name}</h2>
+              <p>{user.xp} XP</p>
+              <div className="chip-row">
+                <span className="chip">Level {user.level}</span>
+                <span className="chip">{user.streak} day streak</span>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
+
+      <div className="leaderboard-list-head">
+        <div>
+          <span className="eyebrow">Full ranking</span>
+          <h2>People to chase this week</h2>
+        </div>
+        <span className="score-pill">{data.leaders.length} athletes</span>
+      </div>
+
       <section className="grid-list">
-        {data.leaders.map((user) => (
+        {(rest.length > 0 ? rest : data.leaders).map((user) => (
           <article key={user.id} className="card leaderboard-card">
             <div className="section-head">
               <div>

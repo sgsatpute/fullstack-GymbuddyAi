@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { setStoredToken } from "../utils/auth";
+import { getAuthToken } from "../utils/authResponse";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -41,7 +42,13 @@ export default function Register() {
         return;
       }
 
-      setStoredToken(data.token);
+      const token = getAuthToken(data);
+      if (!token) {
+        setError("Account created, but the server did not return a session token.");
+        return;
+      }
+
+      setStoredToken(token);
       navigate("/complete-profile");
     } catch {
       setError("Unable to reach the server");
@@ -52,6 +59,19 @@ export default function Register() {
 
   return (
     <div className="auth-page">
+      <div className="auth-brand-panel">
+        <span className="eyebrow">Start strong</span>
+        <h1>Build a profile that unlocks better partners and better coaching.</h1>
+        <p>
+          Your goal, training time, gym, and experience level power the compatibility engine.
+        </p>
+        <div className="auth-proof-grid">
+          <span>Compatibility score</span>
+          <span>Coach memory</span>
+          <span>Groups</span>
+          <span>Progress tracking</span>
+        </div>
+      </div>
       <div className="auth-card">
         <span className="eyebrow">Create account</span>
         <h1>Start building your fitness support system.</h1>
