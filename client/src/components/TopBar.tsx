@@ -32,6 +32,26 @@ export default function TopBar() {
   }
 
   return (
+    <>
+    <header className="topbar-mobile">
+      <Link to="/dashboard" className="flex items-center gap-3">
+        <div className="mobile-brand-mark">
+          <Bot size={18} />
+        </div>
+        <div>
+          <div className="font-semibold text-white">GymBuddy AI</div>
+          <div className="tiny-muted">Social fitness coach</div>
+        </div>
+      </Link>
+
+      <div className="flex items-center gap-2">
+        <NotificationCenter />
+        <Link to="/profile/me">
+          <Avatar name={user?.name} avatarUrl={user?.avatarUrl} size="sm" />
+        </Link>
+      </div>
+    </header>
+
     <header className="topbar-desktop">
       <Link to="/dashboard" className="flex items-center gap-3 font-semibold text-white">
         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent/20 text-accent">
@@ -101,5 +121,6 @@ export default function TopBar() {
         </details>
       </div>
     </header>
+    </>
   );
 }
