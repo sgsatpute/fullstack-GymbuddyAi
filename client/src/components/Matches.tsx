@@ -103,13 +103,17 @@ export default function Matches() {
         </section>
       ) : (
         <section className="grid-list">
-          {matches.map((match) => (
+          {matches.map((match) => {
+            const reasons = match.reasons ?? match.compatibilityReasons ?? [];
+            const tier = match.tier ?? match.matchLabel ?? "Compatible";
+
+            return (
             <article key={match.user.id} className="card match-card">
               <div className="section-head">
                 <div className="match-headline">
                   <Avatar name={match.user.name} avatarUrl={match.user.avatarUrl} size="md" />
                   <div>
-                    <span className="eyebrow">{match.tier}</span>
+                    <span className="eyebrow">{tier}</span>
                     <h2>{match.user.name}</h2>
                   </div>
                 </div>
@@ -137,7 +141,7 @@ export default function Matches() {
               </p>
 
               <ul className="reason-list">
-                {match.reasons.map((reason) => (
+                {reasons.map((reason) => (
                   <li key={reason}>{reason}</li>
                 ))}
               </ul>
@@ -178,7 +182,8 @@ export default function Matches() {
                 )}
               </div>
             </article>
-          ))}
+            );
+          })}
         </section>
       )}
     </div>
