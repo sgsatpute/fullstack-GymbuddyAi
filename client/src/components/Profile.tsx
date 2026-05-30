@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { LogOut } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import Avatar from "./Avatar";
 import { apiFetch } from "../utils/api";
-import { getCurrentUserId } from "../utils/auth";
+import { getCurrentUserId, logoutSession } from "../utils/auth";
 import { formatExperience, formatGoal, formatShortDate, formatTimePreference } from "../utils/display";
 import { Achievement, UserProfile } from "../utils/models";
 
@@ -57,6 +58,11 @@ export default function Profile() {
     }
   }
 
+  async function handleLogout() {
+    await logoutSession();
+    navigate("/login");
+  }
+
   if (loading) {
     return <div className="page-section">Loading profile...</div>;
   }
@@ -76,8 +82,8 @@ export default function Profile() {
       : null;
 
   return (
-    <div className="page-stack">
-      <section className="hero-panel">
+    <div className="page-stack profile-experience">
+      <section className="hero-panel profile-hero">
         <div className="hero-profile">
           <Avatar name={profile.name} avatarUrl={profile.avatarUrl} size="lg" />
           <div>
@@ -100,9 +106,15 @@ export default function Profile() {
 
         <div className="hero-actions">
           {isSelf ? (
-            <button className="btn btn-primary" onClick={() => navigate("/complete-profile")}>
-              Edit Profile
-            </button>
+            <>
+              <button className="btn btn-primary" onClick={() => navigate("/complete-profile")}>
+                Edit Profile
+              </button>
+              <button className="btn btn-secondary btn-danger-soft" onClick={handleLogout}>
+                <LogOut size={16} />
+                Logout
+              </button>
+            </>
           ) : (
             <>
               <button

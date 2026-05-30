@@ -214,8 +214,8 @@ export default function Nutrition() {
   const history = overview?.history ?? [];
 
   return (
-    <div className="page-stack">
-      <section className="hero-panel">
+    <div className="page-stack nutrition-experience">
+      <section className="hero-panel nutrition-hero">
         <div>
           <span className="eyebrow">Nutrition</span>
           <h1>Track calories, macros, and photo-based meal estimates.</h1>

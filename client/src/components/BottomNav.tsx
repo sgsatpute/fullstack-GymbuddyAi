@@ -9,7 +9,7 @@ const tabs = [
   { to: "/matches", label: "Matches", icon: Users },
   { to: "/nutrition", label: "Nutrition", icon: UtensilsCrossed },
   { to: "/coach", label: "Coach", icon: Bot },
-  { to: "/chat", label: "Chat", icon: MessageCircle },
+  { to: "/inbox", label: "Inbox", icon: MessageCircle },
   { to: "/profile/me", label: "Profile", icon: User },
 ];
 
@@ -42,7 +42,7 @@ export default function BottomNav() {
               <>
                 <div className="relative">
                   <Icon size={24} />
-                  {tab.label === "Chat" && unreadCount > 0 && (
+                  {tab.label === "Inbox" && unreadCount > 0 && (
                     <span className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-red-500" />
                   )}
                 </div>

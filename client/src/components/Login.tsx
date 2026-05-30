@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { setStoredToken } from "../utils/auth";
+import { getAuthToken } from "../utils/authResponse";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -28,7 +29,13 @@ export default function Login() {
         return;
       }
 
-      setStoredToken(data.token);
+      const token = getAuthToken(data);
+      if (!token) {
+        setError("Login succeeded, but the server did not return a session token.");
+        return;
+      }
+
+      setStoredToken(token);
       navigate("/dashboard");
     } catch {
       setError("Unable to reach the server");
@@ -39,6 +46,19 @@ export default function Login() {
 
   return (
     <div className="auth-page">
+      <div className="auth-brand-panel">
+        <span className="eyebrow">GymBuddy AI</span>
+        <h1>Training works better when someone expects you to show up.</h1>
+        <p>
+          Match with compatible gym partners, keep streaks alive, and ask Coach Alex for the next best move.
+        </p>
+        <div className="auth-proof-grid">
+          <span>AI coach</span>
+          <span>Gym matches</span>
+          <span>XP streaks</span>
+          <span>Meal logging</span>
+        </div>
+      </div>
       <div className="auth-card">
         <span className="eyebrow">Welcome back</span>
         <h1>Pick up your training momentum.</h1>

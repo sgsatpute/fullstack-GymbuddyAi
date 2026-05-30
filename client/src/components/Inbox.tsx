@@ -24,8 +24,8 @@ export default function Inbox() {
   }
 
   return (
-    <div className="page-stack">
-      <section className="hero-panel">
+    <div className="page-stack inbox-experience">
+      <section className="hero-panel inbox-hero">
         <div>
           <span className="eyebrow">Inbox</span>
           <h1>Stay in touch with your gym partners.</h1>
@@ -51,45 +51,54 @@ export default function Inbox() {
           </button>
         </section>
       ) : (
-        <section className="grid-list">
-          {conversations.map((conversation) => (
-            <article key={conversation.userId} className="card conversation-card">
-              <div className="conversation-top">
-                <div className="match-headline">
-                  <Avatar name={conversation.user.name} avatarUrl={conversation.user.avatarUrl} size="md" />
-                  <div>
-                    <h3>{conversation.user.name}</h3>
-                    <p className="muted">
-                      {formatGoal(conversation.user.goal)} · {formatExperience(conversation.user.experience)}
-                    </p>
+        <>
+          <div className="leaderboard-list-head">
+            <div>
+              <span className="eyebrow">Active conversations</span>
+              <h2>Keep the plan moving</h2>
+            </div>
+            <span className="score-pill">{conversations.length} chats</span>
+          </div>
+          <section className="grid-list">
+            {conversations.map((conversation) => (
+              <article key={conversation.userId} className="card conversation-card">
+                <div className="conversation-top">
+                  <div className="match-headline">
+                    <Avatar name={conversation.user.name} avatarUrl={conversation.user.avatarUrl} size="md" />
+                    <div>
+                      <h3>{conversation.user.name}</h3>
+                      <p className="muted">
+                        {formatGoal(conversation.user.goal)} · {formatExperience(conversation.user.experience)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="conversation-meta">
+                    <span className="muted">{formatDateTime(conversation.lastMessageAt)}</span>
+                    {conversation.unreadCount > 0 && (
+                      <span className="badge badge-accent">{conversation.unreadCount} unread</span>
+                    )}
                   </div>
                 </div>
-                <div className="conversation-meta">
-                  <span className="muted">{formatDateTime(conversation.lastMessageAt)}</span>
-                  {conversation.unreadCount > 0 && (
-                    <span className="badge badge-accent">{conversation.unreadCount} unread</span>
-                  )}
+
+                <p className="conversation-preview">{conversation.lastMessage}</p>
+
+                <div className="chip-row">
+                  {conversation.user.gym && <span className="chip">{conversation.user.gym}</span>}
+                  {conversation.user.level && <span className="chip">Level {conversation.user.level}</span>}
                 </div>
-              </div>
 
-              <p className="conversation-preview">{conversation.lastMessage}</p>
-
-              <div className="chip-row">
-                {conversation.user.gym && <span className="chip">{conversation.user.gym}</span>}
-                {conversation.user.level && <span className="chip">Level {conversation.user.level}</span>}
-              </div>
-
-              <div className="action-row">
-                <button className="btn btn-primary" onClick={() => navigate(`/chat/${conversation.userId}`)}>
-                  Open Chat
-                </button>
-                <button className="btn btn-secondary" onClick={() => navigate(`/profile/${conversation.userId}`)}>
-                  View Profile
-                </button>
-              </div>
-            </article>
-          ))}
-        </section>
+                <div className="action-row">
+                  <button className="btn btn-primary" onClick={() => navigate(`/chat/${conversation.userId}`)}>
+                    Open Chat
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => navigate(`/profile/${conversation.userId}`)}>
+                    View Profile
+                  </button>
+                </div>
+              </article>
+            ))}
+          </section>
+        </>
       )}
     </div>
   );

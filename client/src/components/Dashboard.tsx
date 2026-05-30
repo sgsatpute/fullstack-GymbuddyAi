@@ -211,7 +211,7 @@ export default function Dashboard() {
 
   if (!user.profileComplete) {
     return (
-      <div className="page-stack">
+      <div className="page-stack dashboard-experience">
         <section className="hero-panel">
           <div>
             <span className="eyebrow">Finish setup</span>
@@ -229,8 +229,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="page-stack">
-      <section className="hero-panel">
+    <div className="page-stack dashboard-experience">
+      <section className="hero-panel dashboard-hero">
         <div className="hero-profile">
           <Avatar name={user.name} avatarUrl={user.avatarUrl} size="lg" />
           <div>

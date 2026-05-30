@@ -239,7 +239,7 @@ export default function Coach() {
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack coach-experience">
       <CoachHeader summary={summary} onRefresh={refreshPlan} isRefreshing={loadingPlan} />
 
       {(error || feedback) && <div className={`feedback ${error ? "error" : "success"}`}>{error || feedback}</div>}

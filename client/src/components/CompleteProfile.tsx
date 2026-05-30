@@ -72,14 +72,28 @@ export default function CompleteProfile() {
   }
 
   return (
-    <div className="page-stack">
-      <section className="hero-panel">
+    <div className="page-stack onboarding-experience">
+      <section className="hero-panel onboarding-hero">
         <div>
           <span className="eyebrow">Complete your profile</span>
           <h1>Help the matching system work harder for you.</h1>
           <p>
             The better your profile, the better the compatibility signals, trust, and conversation quality.
           </p>
+        </div>
+        <div className="profile-stepper" aria-label="Profile setup progress">
+          <div className="step-card active">
+            <strong>1</strong>
+            <span>Account ready</span>
+          </div>
+          <div className="step-card active">
+            <strong>2</strong>
+            <span>Training profile</span>
+          </div>
+          <div className="step-card">
+            <strong>3</strong>
+            <span>Match deck</span>
+          </div>
         </div>
       </section>
 

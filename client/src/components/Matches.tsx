@@ -1,54 +1,115 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence } from "framer-motion";
+import { MessageCircle, Radar, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Avatar from "./Avatar";
+import MatchSpotlight from "./matches/MatchSpotlight";
 import { apiFetch } from "../utils/api";
-import {
-  formatDistanceKm,
-  formatExperience,
-  formatGoal,
-  formatTimePreference,
-} from "../utils/display";
-import { MatchItem } from "../utils/models";
+import { formatGoal } from "../utils/display";
+import { MatchItem, UserProfile } from "../utils/models";
+
+type MatchFilter = "all" | "near" | "sameGoal" | "morning" | "evening" | "online";
+
+const filters: Array<{ id: MatchFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "near", label: "Near Me" },
+  { id: "sameGoal", label: "Same Goal" },
+  { id: "morning", label: "Morning" },
+  { id: "evening", label: "Evening" },
+  { id: "online", label: "Online Now" },
+];
+
+function normalizeOnlineStatus(payload: unknown) {
+  const status: Record<number, boolean> = {};
+  if (!payload || typeof payload !== "object") return status;
+
+  Object.entries(payload as Record<string, unknown>).forEach(([id, value]) => {
+    status[Number(id)] = Boolean(value);
+  });
+
+  return status;
+}
 
 export default function Matches() {
   const [matches, setMatches] = useState<MatchItem[]>([]);
+  const [me, setMe] = useState<UserProfile | null>(null);
+  const [onlineByUserId, setOnlineByUserId] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [activeFilter, setActiveFilter] = useState<MatchFilter>("all");
+  const [dismissedIds, setDismissedIds] = useState<number[]>([]);
   const [introLoadingId, setIntroLoadingId] = useState<number | null>(null);
   const [introByUserId, setIntroByUserId] = useState<Record<number, string>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
-    apiFetch("/api/matches")
-      .then(async (response) => {
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
+    async function loadMatches() {
+      try {
+        const [matchResponse, profileResponse] = await Promise.all([
+          apiFetch("/api/matches"),
+          apiFetch("/api/users/me"),
+        ]);
+
+        if (!matchResponse.ok) {
+          const data = await matchResponse.json().catch(() => ({}));
           if (data?.error === "PROFILE_INCOMPLETE") {
             navigate("/complete-profile");
-            return null;
+            return;
           }
           throw new Error("Failed to load matches");
         }
 
-        return response.json();
-      })
-      .then((data: MatchItem[] | null) => {
-        if (data) {
-          setMatches(data);
+        const data = (await matchResponse.json()) as MatchItem[];
+        setMatches(data);
+
+        if (profileResponse.ok) {
+          setMe((await profileResponse.json()) as UserProfile);
         }
-      })
-      .catch(() => setError("Could not load your matches right now."))
-      .finally(() => setLoading(false));
+
+        const ids = data.map((match) => match.user.id).join(",");
+        if (ids) {
+          const onlineResponse = await apiFetch(`/api/users/online-status?ids=${ids}`);
+          if (onlineResponse.ok) {
+            setOnlineByUserId(normalizeOnlineStatus(await onlineResponse.json()));
+          }
+        }
+      } catch {
+        setError("Could not load your matches right now.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadMatches();
   }, [navigate]);
+
+  const filteredMatches = useMemo(() => {
+    return matches
+      .filter((match) => !dismissedIds.includes(match.user.id))
+      .filter((match) => {
+        if (activeFilter === "near") return Number(match.distanceKm ?? 99) <= 5;
+        if (activeFilter === "sameGoal") return Boolean(me?.goal && match.user.goal === me.goal);
+        if (activeFilter === "morning") return match.user.preferredTime === "morning";
+        if (activeFilter === "evening") return match.user.preferredTime === "evening";
+        if (activeFilter === "online") return Boolean(onlineByUserId[match.user.id]);
+        return true;
+      });
+  }, [activeFilter, dismissedIds, matches, me?.goal, onlineByUserId]);
+
+  const activeMatch = filteredMatches[0];
+  const nextMatches = filteredMatches.slice(1, 4);
+  const bestScore = matches.reduce((best, match) => Math.max(best, match.score), 0);
+  const nearbyCount = matches.filter((match) => Number(match.distanceKm ?? 99) <= 5).length;
+  const chatReadyCount = matches.filter((match) => match.canChat).length;
 
   async function generateIntro(userId: number) {
     setIntroLoadingId(userId);
     setError("");
+    setNotice("");
 
     try {
-      const response = await apiFetch(`/api/matches/${userId}/intro`, {
-        method: "POST",
-      });
+      const response = await apiFetch(`/api/matches/${userId}/intro`, { method: "POST" });
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -56,10 +117,8 @@ export default function Matches() {
         return;
       }
 
-      setIntroByUserId((current) => ({
-        ...current,
-        [userId]: data.message,
-      }));
+      setIntroByUserId((current) => ({ ...current, [userId]: data.message }));
+      setNotice("AI opener generated. Review it, then send when it feels natural.");
     } catch {
       setError("Could not generate an intro right now.");
     } finally {
@@ -67,123 +126,141 @@ export default function Matches() {
     }
   }
 
-  function openChatWithIntro(userId: number) {
-    const draftMessage = introByUserId[userId];
+  function skipMatch(userId: number) {
+    setDismissedIds((current) => [...current, userId]);
+    setNotice("Skipped locally. Refresh the deck if you want to bring profiles back.");
+  }
 
-    navigate(`/chat/${userId}`, {
-      state: draftMessage ? { draftMessage } : undefined,
+  function openChat(match: MatchItem) {
+    if (!match.canChat) {
+      setError("This match needs a 60% compatibility score before chat unlocks.");
+      return;
+    }
+
+    navigate(`/chat/${match.user.id}`, {
+      state: introByUserId[match.user.id] ? { draftMessage: introByUserId[match.user.id] } : undefined,
     });
   }
 
   if (loading) {
-    return <div className="page-section">Finding your best gym matches...</div>;
+    return <div className="page-section">Building your match deck...</div>;
   }
 
   return (
-    <div className="page-stack">
-      <section className="hero-panel">
-        <div>
-          <span className="eyebrow">Matches</span>
-          <h1>People who fit your training rhythm.</h1>
+    <div className="page-stack matches-experience">
+      <section className="matches-hero">
+        <div className="matches-hero-copy">
+          <span className="eyebrow">GymBuddy Discover</span>
+          <h1>Find the person who makes training harder to skip.</h1>
           <p>
-            Each match is scored from a mix of goals, training schedule, consistency, and shared location signals.
+            Swipe through people ranked by goals, timing, experience, distance, and consistency signals.
           </p>
+          <div className="match-hero-actions">
+            <button className="btn btn-primary" type="button" onClick={() => navigate("/complete-profile")}>
+              Tune Profile
+            </button>
+            <button className="btn btn-secondary" type="button" onClick={() => setDismissedIds([])}>
+              <RotateCcw size={16} />
+              Reset Deck
+            </button>
+          </div>
         </div>
-        <button className="btn btn-secondary" onClick={() => navigate("/complete-profile")}>
-          Update Profile
-        </button>
+        <div className="match-radar-card">
+          <Radar size={24} />
+          <strong>{matches.length}</strong>
+          <span>profiles scanned</span>
+          <div className="match-radar-line">
+            <span>Best score</span>
+            <b>{bestScore}%</b>
+          </div>
+          <div className="match-radar-line">
+            <span>Near you</span>
+            <b>{nearbyCount}</b>
+          </div>
+          <div className="match-radar-line">
+            <span>Chat ready</span>
+            <b>{chatReadyCount}</b>
+          </div>
+        </div>
       </section>
 
+      <div className="filter-rail" role="tablist" aria-label="Match filters">
+        {filters.map((filter) => (
+          <button
+            key={filter.id}
+            className={`match-filter ${activeFilter === filter.id ? "active" : ""}`}
+            type="button"
+            onClick={() => setActiveFilter(filter.id)}
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
+
       {error && <div className="feedback error">{error}</div>}
+      {notice && !error && <div className="feedback success">{notice}</div>}
 
       {matches.length === 0 ? (
         <section className="card empty-state">
           <h2>No strong matches yet</h2>
-          <p>Try refining your profile or come back after more people complete their training details.</p>
+          <p>Update your profile details or come back after more people complete their training setup.</p>
+        </section>
+      ) : !activeMatch ? (
+        <section className="card empty-state">
+          <h2>No profiles in this view</h2>
+          <p>Try another filter or reset the deck to review skipped profiles again.</p>
+          <button className="btn btn-primary" type="button" onClick={() => setDismissedIds([])}>
+            Reset Deck
+          </button>
         </section>
       ) : (
-        <section className="grid-list">
-          {matches.map((match) => {
-            const reasons = match.reasons ?? match.compatibilityReasons ?? [];
-            const tier = match.tier ?? match.matchLabel ?? "Compatible";
+        <section className="match-deck-grid">
+          <div className="match-deck-stage">
+            <div className="match-stack-preview" aria-hidden="true">
+              {nextMatches.map((match, index) => (
+                <div key={match.user.id} className="match-stack-card" style={{ transform: `translateY(${(index + 1) * 12}px) scale(${1 - index * 0.035})` }} />
+              ))}
+            </div>
 
-            return (
-            <article key={match.user.id} className="card match-card">
-              <div className="section-head">
-                <div className="match-headline">
-                  <Avatar name={match.user.name} avatarUrl={match.user.avatarUrl} size="md" />
-                  <div>
-                    <span className="eyebrow">{tier}</span>
-                    <h2>{match.user.name}</h2>
-                  </div>
-                </div>
-                <div className="score-pill">{match.score}%</div>
-              </div>
+            <AnimatePresence mode="wait">
+              <MatchSpotlight
+                match={activeMatch}
+                online={Boolean(onlineByUserId[activeMatch.user.id])}
+                intro={introByUserId[activeMatch.user.id]}
+                introLoading={introLoadingId === activeMatch.user.id}
+                onSkip={() => skipMatch(activeMatch.user.id)}
+                onMessage={() => openChat(activeMatch)}
+                onGenerateIntro={() => generateIntro(activeMatch.user.id)}
+              />
+            </AnimatePresence>
+          </div>
 
-              <p className="muted">
-                {formatGoal(match.user.goal)} · {formatExperience(match.user.experience)} ·{" "}
-                {formatTimePreference(match.user.preferredTime)}
-              </p>
-
-              <div className="chip-row">
-                {match.user.gym && <span className="chip">{match.user.gym}</span>}
-                {match.distanceKm !== null && match.distanceKm !== undefined && (
-                  <span className="chip">{formatDistanceKm(match.distanceKm)}</span>
-                )}
-                {match.locationInsight && <span className="chip">{match.locationInsight}</span>}
-                <span className="chip">Level {match.user.level}</span>
-                <span className="chip">{match.user.streak} day streak</span>
-              </div>
-
+          <aside className="match-side-panel">
+            <div>
+              <span className="eyebrow">Why this page matters</span>
+              <h2>Make the next action obvious.</h2>
               <p>
-                {match.user.bio?.trim() ||
-                  "This athlete is ready to stay more consistent with the right training partner."}
+                A good fitness social app should reduce friction: see fit, understand why, message fast.
               </p>
-
-              <ul className="reason-list">
-                {reasons.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-
-              {introByUserId[match.user.id] && (
-                <div className="feedback success">
-                  <strong>AI intro ready</strong>
-                  <p>{introByUserId[match.user.id]}</p>
-                </div>
-              )}
-
-              <div className="action-row">
-                <button className="btn btn-primary" onClick={() => navigate(`/profile/${match.user.id}`)}>
-                  View Profile
+            </div>
+            <div className="match-guidance-list">
+              <span>Drag right or tap the heart to message.</span>
+              <span>Drag left or tap X to skip this profile locally.</span>
+              <span>Use AI Intro when you want a natural first message.</span>
+            </div>
+            <div className="match-mini-list">
+              {filteredMatches.slice(0, 4).map((match) => (
+                <button key={match.user.id} type="button" onClick={() => openChat(match)}>
+                  <Avatar name={match.user.name} avatarUrl={match.user.avatarUrl} size="sm" />
+                  <span>
+                    <strong>{match.user.name}</strong>
+                    <small>{match.score}% / {formatGoal(match.user.goal)}</small>
+                  </span>
+                  <MessageCircle size={16} />
                 </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => openChatWithIntro(match.user.id)}
-                  disabled={!match.canChat}
-                >
-                  {match.canChat ? "Start Chat" : "Unlock at 60%"}
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => generateIntro(match.user.id)}
-                  disabled={!match.canChat || introLoadingId === match.user.id}
-                >
-                  {introLoadingId === match.user.id
-                    ? "Thinking..."
-                    : introByUserId[match.user.id]
-                      ? "Regenerate Intro"
-                      : "AI Intro"}
-                </button>
-                {match.mapsUrl && (
-                  <a className="btn btn-secondary" href={match.mapsUrl} target="_blank" rel="noreferrer">
-                    Open Map
-                  </a>
-                )}
-              </div>
-            </article>
-            );
-          })}
+              ))}
+            </div>
+          </aside>
         </section>
       )}
     </div>
