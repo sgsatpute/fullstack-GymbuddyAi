@@ -7,16 +7,24 @@ type TokenPayload = {
 
 let refreshPromise: Promise<string | null> | null = null;
 
+function getStorage() {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function getStoredToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return getStorage()?.getItem(TOKEN_KEY) ?? null;
 }
 
 export function setStoredToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token);
+  getStorage()?.setItem(TOKEN_KEY, token);
 }
 
 export function clearStoredToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  getStorage()?.removeItem(TOKEN_KEY);
 }
 
 export function hasStoredToken() {
