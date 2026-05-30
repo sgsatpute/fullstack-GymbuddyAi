@@ -1,10 +1,12 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Dumbbell } from "lucide-react";
+import { Brain, Dumbbell, ShieldCheck } from "lucide-react";
 import { apiFetch } from "../utils/api";
 import { CoachPlanResponse, WorkoutOverview, CoachConversationMessage } from "../utils/coachTypes";
 import {
   formatShortDate,
   formatMinutes,
+  formatExperience,
+  formatGoal,
   formatWorkoutType,
   formatIntensity,
   formatEnergy,
@@ -24,12 +26,74 @@ const initialWorkoutForm = {
   notes: "",
 };
 
+type CoachAiStatus = {
+  aiEnabled: boolean;
+  mode: "claude" | "fallback";
+  model: string;
+  memory: {
+    name?: string;
+    goal?: string;
+    experience?: string;
+    city?: string;
+    gym?: string;
+    streak?: number;
+    workoutsThisMonth?: number;
+    leaderboardRank?: number | string;
+    nextSuggestedFocus?: string;
+  };
+};
+
 async function readJsonOrThrow(response: Response) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error((data as { error?: string }).error || "Request failed");
   }
   return data;
+}
+
+async function readCoachStream(response: Response, onChunk: (chunk: string) => void) {
+  if (!response.body) {
+    const data = await readJsonOrThrow(response);
+    return String((data as { reply?: string }).reply ?? "");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalReply = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+
+    let boundaryIndex = buffer.indexOf("\n\n");
+    while (boundaryIndex !== -1) {
+      const rawEvent = buffer.slice(0, boundaryIndex);
+      buffer = buffer.slice(boundaryIndex + 2);
+      boundaryIndex = buffer.indexOf("\n\n");
+
+      const eventName = rawEvent.match(/^event:\s*(.+)$/m)?.[1]?.trim();
+      const dataLine = rawEvent.match(/^data:\s*(.+)$/m)?.[1]?.trim();
+      if (!dataLine) {
+        continue;
+      }
+
+      const payload = JSON.parse(dataLine) as { text?: string; reply?: string };
+      if (eventName === "chunk" && payload.text) {
+        finalReply += payload.text;
+        onChunk(payload.text);
+      }
+      if (eventName === "done" && payload.reply) {
+        finalReply = payload.reply;
+      }
+    }
+
+    if (done) {
+      break;
+    }
+  }
+
+  return finalReply.trim();
 }
 
 export default function Coach() {
@@ -43,6 +107,7 @@ export default function Coach() {
   const [plan, setPlan] = useState<CoachPlanResponse | null>(null);
   const [workouts, setWorkouts] = useState<WorkoutOverview | null>(null);
   const [messages, setMessages] = useState<CoachConversationMessage[]>([]);
+  const [aiStatus, setAiStatus] = useState<CoachAiStatus | null>(null);
   const [chatDraft, setChatDraft] = useState("");
   const [workoutForm, setWorkoutForm] = useState(initialWorkoutForm);
 
@@ -52,9 +117,10 @@ export default function Coach() {
   const loadPlan = async () => setPlan((await readJsonOrThrow(await apiFetch("/api/coach/plan"))) as CoachPlanResponse);
   const loadWorkouts = async () => setWorkouts((await readJsonOrThrow(await apiFetch("/api/workouts"))) as WorkoutOverview);
   const loadMessages = async () => setMessages((await readJsonOrThrow(await apiFetch("/api/coach/messages"))) as CoachConversationMessage[]);
+  const loadAiStatus = async () => setAiStatus((await readJsonOrThrow(await apiFetch("/api/coach/status"))) as CoachAiStatus);
 
   useEffect(() => {
-    Promise.all([loadPlan(), loadWorkouts(), loadMessages()])
+    Promise.all([loadPlan(), loadWorkouts(), loadMessages(), loadAiStatus()])
       .catch(() => setError("Could not load your coaching workspace right now."))
       .finally(() => setLoading(false));
   }, []);
@@ -111,22 +177,50 @@ export default function Coach() {
       content: message,
       createdAt: new Date().toISOString(),
     };
+    const streamingMsg: CoachConversationMessage = {
+      id: Date.now() + 1,
+      role: "assistant",
+      content: "",
+      createdAt: new Date().toISOString(),
+    };
 
     setSendingMessage(true);
     setError("");
     setChatDraft("");
-    setMessages((current) => [...current, optimisticMsg]);
+    setMessages((current) => [...current, optimisticMsg, streamingMsg]);
 
     try {
-      const res = await apiFetch("/api/coach/message", { method: "POST", body: JSON.stringify({ message }) });
-      const data = (await readJsonOrThrow(res)) as { reply: string };
-      setMessages((current) => [
-        ...current,
-        { id: Date.now() + 1, role: "assistant", content: data.reply, createdAt: new Date().toISOString() },
-      ]);
+      const res = await apiFetch("/api/coach/message", {
+        method: "POST",
+        headers: { Accept: "text/event-stream" },
+        body: JSON.stringify({ message }),
+      });
+
+      if (!res.ok) {
+        await readJsonOrThrow(res);
+      }
+
+      const reply = await readCoachStream(res, (chunk) => {
+        setMessages((current) =>
+          current.map((entry) =>
+            entry.id === streamingMsg.id
+              ? { ...entry, content: `${entry.content}${chunk}` }
+              : entry
+          )
+        );
+      });
+
+      setMessages((current) =>
+        current.map((entry) =>
+          entry.id === streamingMsg.id ? { ...entry, content: reply || entry.content } : entry
+        )
+      );
       loadPlan().catch(() => {});
+      loadMessages().catch(() => {});
     } catch (e) {
-      setMessages((current) => current.filter((entry) => entry.id !== optimisticMsg.id));
+      setMessages((current) =>
+        current.filter((entry) => entry.id !== optimisticMsg.id && entry.id !== streamingMsg.id)
+      );
       setChatDraft(message);
       setError(e instanceof Error ? e.message : "Could not reach the coach right now.");
     } finally {
@@ -143,6 +237,32 @@ export default function Coach() {
       <CoachHeader summary={summary} onRefresh={refreshPlan} isRefreshing={loadingPlan} />
 
       {(error || feedback) && <div className={`feedback ${error ? "error" : "success"}`}>{error || feedback}</div>}
+
+      {aiStatus && (
+        <section className="card ai-status-panel">
+          <div className="section-head">
+            <div>
+              <span className="eyebrow">AI Coach status</span>
+              <h2>{aiStatus.aiEnabled ? "Claude is connected to Alex." : "Fallback coaching is active."}</h2>
+              <p>
+                {aiStatus.aiEnabled
+                  ? "Replies use your profile, recent workouts, streak, and leaderboard context."
+                  : "Add ANTHROPIC_API_KEY in production to unlock live Claude coaching. The app is using safe rule-based guidance for now."}
+              </p>
+            </div>
+            {aiStatus.aiEnabled ? <Brain size={20} /> : <ShieldCheck size={20} />}
+          </div>
+
+          <div className="ai-memory-grid">
+            <span>Goal: {formatGoal(aiStatus.memory.goal)}</span>
+            <span>Experience: {formatExperience(aiStatus.memory.experience)}</span>
+            <span>Gym: {aiStatus.memory.gym || "Not shared"}</span>
+            <span>Streak: {aiStatus.memory.streak ?? 0} days</span>
+            <span>Workouts this month: {aiStatus.memory.workoutsThisMonth ?? 0}</span>
+            <span>Next focus: {titleCase(aiStatus.memory.nextSuggestedFocus ?? "Build consistency")}</span>
+          </div>
+        </section>
+      )}
 
       {summary && (
         <section className="stats-grid">
@@ -268,6 +388,7 @@ export default function Coach() {
             setChatDraft(msg);
             setError("");
           }}
+          aiEnabled={aiStatus?.aiEnabled ?? false}
           bottomRef={bottomRef}
         />
       </section>

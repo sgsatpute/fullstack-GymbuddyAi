@@ -11,6 +11,7 @@ interface CoachChatProps {
   onSendMessage: (messageOverride?: string) => void;
   quickPrompts?: CoachPromptSuggestion[];
   onUsePrompt: (message: string) => void;
+  aiEnabled: boolean;
   bottomRef: React.RefObject<HTMLDivElement>;
 }
 
@@ -22,6 +23,7 @@ export default function CoachChat({
   onSendMessage,
   quickPrompts,
   onUsePrompt,
+  aiEnabled,
   bottomRef,
 }: CoachChatProps) {
   return (
@@ -30,6 +32,11 @@ export default function CoachChat({
         <div>
           <span className="eyebrow">Coach Chat</span>
           <h2>Ask for the next best move</h2>
+          <p className="muted">
+            {aiEnabled
+              ? "Streaming personalized advice from your training context."
+              : "Fallback mode is active until Claude is configured."}
+          </p>
         </div>
         <Bot size={18} />
       </div>
@@ -62,7 +69,18 @@ export default function CoachChat({
                 className={message.role === "assistant" ? "coach-chat-row ai" : "coach-chat-row user"}
               >
                 <div className={message.role === "assistant" ? "chat-bubble-ai" : "chat-bubble-user"}>
-                  <div className="whitespace-pre-wrap">{message.content}</div>
+                  <div className="whitespace-pre-wrap">
+                    {message.content || (
+                      <span className="typing-dots" aria-label="Coach is thinking">
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                    )}
+                    {message.role === "assistant" && sendingMessage && message.content && (
+                      <span className="streaming-cursor" aria-hidden="true" />
+                    )}
+                  </div>
                   <div className="mt-2 text-[11px] opacity-70">
                     {formatDateTime(message.createdAt)}
                   </div>
