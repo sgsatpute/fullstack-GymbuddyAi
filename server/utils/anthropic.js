@@ -50,16 +50,17 @@ function normalizeMessages(messages = []) {
   }));
 }
 
-function getGeminiText(payload) {
+function getGeminiText(payload, { trim = true } = {}) {
   const parts = payload?.candidates?.[0]?.content?.parts;
   if (!Array.isArray(parts)) {
     return "";
   }
 
-  return parts
+  const text = parts
     .map((part) => (typeof part?.text === "string" ? part.text : ""))
-    .join("")
-    .trim();
+    .join("");
+
+  return trim ? text.trim() : text;
 }
 
 function toGeminiRole(role) {
@@ -268,7 +269,7 @@ Always end with one actionable next step.`;
       const response = await this.createMessage({
         system: this.generateSystemPrompt(userProfile, userStats),
         messages: [...normalizeMessages(history).slice(-10), { role: "user", content: newMessage }],
-        maxTokens: 450,
+        maxTokens: 700,
         stream: true,
       });
 
@@ -298,14 +299,19 @@ Always end with one actionable next step.`;
             .filter(Boolean);
 
           const eventName = lines.find((line) => line.startsWith("event:"))?.replace("event:", "").trim();
-          const dataLine = lines.find((line) => line.startsWith("data:"))?.replace("data:", "").trim();
-          if (!dataLine || dataLine === "[DONE]") {
+          const dataText = lines
+            .filter((line) => line.startsWith("data:"))
+            .map((line) => line.replace("data:", "").trimStart())
+            .join("\n")
+            .trim();
+
+          if (!dataText || dataText === "[DONE]") {
             continue;
           }
 
-          const payload = safeJsonParse(dataLine);
+          const payload = safeJsonParse(dataText);
           const chunk = this.provider === "gemini"
-            ? getGeminiText(payload)
+            ? getGeminiText(payload, { trim: false })
             : (
                 payload?.delta?.text ??
                 (eventName === "content_block_delta" ? payload?.delta?.text : "") ??

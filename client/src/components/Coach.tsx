@@ -73,12 +73,18 @@ async function readCoachStream(response: Response, onChunk: (chunk: string) => v
       boundaryIndex = buffer.indexOf("\n\n");
 
       const eventName = rawEvent.match(/^event:\s*(.+)$/m)?.[1]?.trim();
-      const dataLine = rawEvent.match(/^data:\s*(.+)$/m)?.[1]?.trim();
-      if (!dataLine) {
+      const dataText = rawEvent
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.replace("data:", "").trimStart())
+        .join("\n")
+        .trim();
+
+      if (!dataText) {
         continue;
       }
 
-      const payload = JSON.parse(dataLine) as { text?: string; reply?: string };
+      const payload = JSON.parse(dataText) as { text?: string; reply?: string };
       if (eventName === "chunk" && payload.text) {
         finalReply += payload.text;
         onChunk(payload.text);
