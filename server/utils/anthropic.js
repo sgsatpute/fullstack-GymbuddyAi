@@ -1,7 +1,7 @@
 import config from "../config.js";
 
-const API_URL = "https://api.anthropic.com/v1/messages";
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 function getContentText(content) {
   if (!Array.isArray(content)) {
@@ -17,10 +17,24 @@ function getContentText(content) {
 }
 
 function safeJsonParse(value) {
+  const raw = String(value ?? "").trim();
+  const fencedMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fencedMatch?.[1]?.trim() || raw;
+
   try {
-    return JSON.parse(value);
+    return JSON.parse(candidate);
   } catch {
-    return null;
+    const start = candidate.indexOf("{");
+    const end = candidate.lastIndexOf("}");
+    if (start === -1 || end === -1 || end <= start) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(candidate.slice(start, end + 1));
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -34,6 +48,31 @@ function normalizeMessages(messages = []) {
           ? message.content
           : String(message.content ?? ""),
   }));
+}
+
+function getGeminiText(payload) {
+  const parts = payload?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) {
+    return "";
+  }
+
+  return parts
+    .map((part) => (typeof part?.text === "string" ? part.text : ""))
+    .join("")
+    .trim();
+}
+
+function toGeminiRole(role) {
+  return role === "assistant" || role === "model" ? "model" : "user";
+}
+
+function toGeminiContents(messages = []) {
+  return normalizeMessages(messages)
+    .map((message) => ({
+      role: toGeminiRole(message.role),
+      parts: [{ text: message.content }],
+    }))
+    .filter((message) => message.parts[0].text.trim());
 }
 
 function buildFallbackWorkoutPlan(userProfile = {}) {
@@ -82,29 +121,68 @@ function buildFallbackProgress(userProfile = {}, weeklyStats = {}) {
 }
 
 export class AnthropicCoach {
-  constructor(apiKey = config.anthropicApiKey, model = DEFAULT_MODEL) {
-    this.apiKey = apiKey;
-    this.model = model;
+  constructor({
+    anthropicApiKey = config.anthropicApiKey,
+    geminiApiKey = config.geminiApiKey,
+    provider = config.aiProvider,
+    anthropicModel = config.anthropicModel,
+    geminiModel = config.geminiModel,
+  } = {}) {
+    this.anthropicApiKey = anthropicApiKey;
+    this.geminiApiKey = geminiApiKey;
+    this.provider = provider;
+    this.anthropicModel = anthropicModel;
+    this.geminiModel = geminiModel;
+    this.model = this.provider === "gemini" ? this.geminiModel : this.anthropicModel;
   }
 
   hasApiKey() {
-    return Boolean(this.apiKey);
+    return this.provider === "gemini"
+      ? Boolean(this.geminiApiKey)
+      : Boolean(this.anthropicApiKey);
+  }
+
+  getProviderName() {
+    if (!this.hasApiKey()) {
+      return "fallback";
+    }
+    return this.provider === "gemini" ? "gemini" : "anthropic";
   }
 
   buildHeaders() {
     return {
       "Content-Type": "application/json",
-      "x-api-key": this.apiKey,
+      "x-api-key": this.anthropicApiKey,
       "anthropic-version": "2023-06-01",
     };
   }
 
-  async createMessage({ system, messages, maxTokens = 350, stream = false }) {
-    const response = await fetch(API_URL, {
+  buildGeminiHeaders() {
+    return {
+      "Content-Type": "application/json",
+      "x-goog-api-key": this.geminiApiKey,
+    };
+  }
+
+  buildGeminiPayload({ system, messages, maxTokens = 350 }) {
+    return {
+      systemInstruction: {
+        parts: [{ text: system }],
+      },
+      contents: toGeminiContents(messages),
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        temperature: 0.7,
+      },
+    };
+  }
+
+  async createAnthropicMessage({ system, messages, maxTokens = 350, stream = false }) {
+    const response = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: this.buildHeaders(),
       body: JSON.stringify({
-        model: this.model,
+        model: this.anthropicModel,
         system,
         max_tokens: maxTokens,
         messages: normalizeMessages(messages),
@@ -117,6 +195,28 @@ export class AnthropicCoach {
     }
 
     return response;
+  }
+
+  async createGeminiMessage({ system, messages, maxTokens = 350, stream = false }) {
+    const endpoint = stream ? "streamGenerateContent?alt=sse" : "generateContent";
+    const response = await fetch(`${GEMINI_API_URL}/${this.geminiModel}:${endpoint}`, {
+      method: "POST",
+      headers: this.buildGeminiHeaders(),
+      body: JSON.stringify(this.buildGeminiPayload({ system, messages, maxTokens })),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini request failed with ${response.status}`);
+    }
+
+    return response;
+  }
+
+  async createMessage(options) {
+    if (this.provider === "gemini") {
+      return this.createGeminiMessage(options);
+    }
+    return this.createAnthropicMessage(options);
   }
 
   generateSystemPrompt(userProfile = {}, userStats = {}) {
@@ -145,7 +245,10 @@ Always end with one actionable next step.`;
         maxTokens,
       });
       const data = await response.json();
-      const text = getContentText(data?.content);
+      const text =
+        this.provider === "gemini"
+          ? getGeminiText(data)
+          : getContentText(data?.content);
       return text || fallbackText;
     } catch {
       return fallbackText;
@@ -201,10 +304,13 @@ Always end with one actionable next step.`;
           }
 
           const payload = safeJsonParse(dataLine);
-          const chunk =
-            payload?.delta?.text ??
-            (eventName === "content_block_delta" ? payload?.delta?.text : "") ??
-            "";
+          const chunk = this.provider === "gemini"
+            ? getGeminiText(payload)
+            : (
+                payload?.delta?.text ??
+                (eventName === "content_block_delta" ? payload?.delta?.text : "") ??
+                ""
+              );
 
           if (chunk) {
             fullText += chunk;
@@ -273,6 +379,45 @@ Keep it specific and motivating.`,
     }
 
     try {
+      if (this.provider === "gemini") {
+        const response = await fetch(`${GEMINI_API_URL}/${this.geminiModel}:generateContent`, {
+          method: "POST",
+          headers: this.buildGeminiHeaders(),
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: system }],
+            },
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: mediaType,
+                      data: imageBase64,
+                    },
+                  },
+                  {
+                    text: prompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              maxOutputTokens: maxTokens,
+              temperature: 0.3,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Gemini vision request failed with ${response.status}`);
+        }
+
+        const data = await response.json();
+        return getGeminiText(data) || fallbackText;
+      }
+
       const response = await this.createMessage({
         system,
         maxTokens,
@@ -308,6 +453,10 @@ Keep it specific and motivating.`,
 const defaultCoach = new AnthropicCoach();
 
 export function hasAnthropicApiKey() {
+  return defaultCoach.hasApiKey();
+}
+
+export function hasConfiguredAi() {
   return defaultCoach.hasApiKey();
 }
 

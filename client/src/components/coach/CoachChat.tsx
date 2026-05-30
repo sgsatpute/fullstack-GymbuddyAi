@@ -35,7 +35,7 @@ export default function CoachChat({
           <p className="muted">
             {aiEnabled
               ? "Streaming personalized advice from your training context."
-              : "Fallback mode is active until Claude is configured."}
+              : "Fallback mode is active until Gemini or Claude is configured."}
           </p>
         </div>
         <Bot size={18} />

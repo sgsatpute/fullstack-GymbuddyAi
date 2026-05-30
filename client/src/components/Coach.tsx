@@ -28,7 +28,7 @@ const initialWorkoutForm = {
 
 type CoachAiStatus = {
   aiEnabled: boolean;
-  mode: "claude" | "fallback";
+  mode: "anthropic" | "gemini" | "fallback";
   model: string;
   memory: {
     name?: string;
@@ -243,11 +243,17 @@ export default function Coach() {
           <div className="section-head">
             <div>
               <span className="eyebrow">AI Coach status</span>
-              <h2>{aiStatus.aiEnabled ? "Claude is connected to Alex." : "Fallback coaching is active."}</h2>
+              <h2>
+                {aiStatus.mode === "gemini"
+                  ? "Gemini is connected to Alex."
+                  : aiStatus.mode === "anthropic"
+                    ? "Claude is connected to Alex."
+                    : "Fallback coaching is active."}
+              </h2>
               <p>
                 {aiStatus.aiEnabled
                   ? "Replies use your profile, recent workouts, streak, and leaderboard context."
-                  : "Add ANTHROPIC_API_KEY in production to unlock live Claude coaching. The app is using safe rule-based guidance for now."}
+                  : "Add GEMINI_API_KEY or ANTHROPIC_API_KEY in production to unlock live AI coaching. The app is using safe rule-based guidance for now."}
               </p>
             </div>
             {aiStatus.aiEnabled ? <Brain size={20} /> : <ShieldCheck size={20} />}

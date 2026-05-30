@@ -17,7 +17,7 @@ The result is a fitness app designed around accountability, not just logging.
 - 🔐 JWT + bcrypt authentication with refresh-token support
 - 💬 Real-time Socket.io chat with typing, delivery, and read receipts
 - 🧠 ML-powered compatibility matching with scores and reasons
-- 🤖 Streaming AI coach powered by Anthropic Claude
+- 🤖 Streaming AI coach powered by Gemini or Anthropic Claude
 - 🏋️ Personalized workout plans from a scikit-learn model
 - 🍎 AI nutrition logging with Indian food database and OpenFoodFacts
 - 📊 Recharts dashboards for training, nutrition, and body progress
@@ -36,7 +36,7 @@ The result is a fitness app designed around accountability, not just logging.
 | --- | --- |
 | Frontend | React 18, TypeScript, Tailwind CSS, TanStack Query, react-hook-form, Zod, Recharts, framer-motion, Socket.io-client, lucide-react |
 | Backend | Node.js 20, Express 4, ES Modules, Passport.js, JWT, bcryptjs, Socket.io 4, Drizzle ORM, Nodemailer, multer, express-rate-limit |
-| AI + ML | Anthropic Claude, Python, scikit-learn, pandas, numpy, joblib |
+| AI + ML | Google Gemini, Anthropic Claude, Python, scikit-learn, pandas, numpy, joblib |
 | DevOps | Docker, Docker Compose, GitHub Actions, Railway, Vercel, Husky, Pino |
 
 ## Screenshots
@@ -83,7 +83,11 @@ docker-compose up --build
 | `SMTP_USER` | SMTP username |
 | `SMTP_PASS` | SMTP password |
 | `SMTP_FROM` | Sender address |
-| `ANTHROPIC_API_KEY` | Claude API key for coach and food analysis |
+| `AI_PROVIDER` | AI provider to use: `gemini` or `anthropic` |
+| `GEMINI_API_KEY` | Google AI Studio key for free-tier Gemini coach and food analysis |
+| `GEMINI_MODEL` | Gemini model name, defaults to `gemini-2.5-flash` |
+| `ANTHROPIC_API_KEY` | Optional Claude API key for coach and food analysis |
+| `ANTHROPIC_MODEL` | Anthropic model name |
 | `GOOGLE_MAPS_API_KEY` | Google Maps key for location matching |
 | `GOOGLE_MAPS_REGION` | Maps region hint |
 
@@ -124,7 +128,7 @@ shared/
 
 ## AI Features
 
-Anthropic Claude powers the streaming coach, daily advice, workout-plan generation, body-progress summaries, nutrition analysis, and meal plans. The Python ML model recommends workout plans from age, goal, experience, availability, BMI, schedule, and training history. The food logger combines a curated Indian food catalog with OpenFoodFacts and Claude analysis. The project is ready for MCP-style integrations around external coaching, nutrition, and deployment workflows.
+Gemini or Anthropic Claude powers the streaming coach, daily advice, workout-plan generation, body-progress summaries, nutrition analysis, and meal plans. Use `AI_PROVIDER=gemini` with a Google AI Studio key for the easiest free-tier setup, or switch to `AI_PROVIDER=anthropic` with Claude credits later. The Python ML model recommends workout plans from age, goal, experience, availability, BMI, schedule, and training history. The food logger combines a curated Indian food catalog with OpenFoodFacts and AI analysis. The project is ready for MCP-style integrations around external coaching, nutrition, and deployment workflows.
 
 ## GymBuddy AI vs SparkyFitness
 

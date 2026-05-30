@@ -91,7 +91,7 @@ router.get("/status", auth, (req, res) => {
 
     res.json({
       aiEnabled: anthropicCoach.hasApiKey(),
-      mode: anthropicCoach.hasApiKey() ? "claude" : "fallback",
+      mode: anthropicCoach.getProviderName(),
       model: anthropicCoach.model,
       memory: {
         name: context.userProfile.name,
