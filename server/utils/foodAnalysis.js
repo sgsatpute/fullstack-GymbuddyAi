@@ -1,5 +1,5 @@
 import anthropicCoach, {
-  hasAnthropicApiKey,
+  hasConfiguredAi,
   requestAnthropicVisionText,
 } from "./anthropic.js";
 import { inferMealTypeFromClock } from "./nutrition.js";
@@ -113,7 +113,7 @@ function sanitizeFoodAnalysis(raw = {}, fallback = fallbackFoodAnalysis("", "fit
 
 export async function analyzeFoodText(description, userGoal = "fitness") {
   const fallback = fallbackFoodAnalysis(description, userGoal);
-  if (!hasAnthropicApiKey()) {
+  if (!hasConfiguredAi()) {
     return fallback;
   }
 
@@ -144,7 +144,7 @@ export async function analyzeNutritionPattern(last7DaysEntries, userGoal = "fitn
     ],
   };
 
-  if (!hasAnthropicApiKey()) {
+  if (!hasConfiguredAi()) {
     return fallback;
   }
 
@@ -169,7 +169,7 @@ export async function generateMealPlan(userProfile = {}, caloricGoal = 2200) {
     notes: "Repeatable meals win. Keep protein present in every meal.",
   };
 
-  if (!hasAnthropicApiKey()) {
+  if (!hasConfiguredAi()) {
     return fallback;
   }
 
@@ -188,7 +188,7 @@ Include 2 snacks and keep it practical.`,
 export async function analyzeFoodImage({ buffer, mediaType, mealHint }) {
   const fallbackMealType = inferMealTypeFromClock();
 
-  if (!hasAnthropicApiKey()) {
+  if (!hasConfiguredAi()) {
     return {
       aiUsed: false,
       manualReviewRequired: true,
@@ -202,7 +202,7 @@ export async function analyzeFoodImage({ buffer, mediaType, mealHint }) {
         fiberGrams: 0,
         confidence: "low",
         notes:
-          "Automatic photo analysis is available once ANTHROPIC_API_KEY is configured.",
+          "Automatic photo analysis is available once GEMINI_API_KEY or ANTHROPIC_API_KEY is configured.",
       },
     };
   }

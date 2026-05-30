@@ -35,6 +35,19 @@ function resolveDbPath(dbPath) {
 }
 
 const nodeEnv = process.env.NODE_ENV ?? "development";
+const anthropicApiKey = process.env.ANTHROPIC_API_KEY ?? "";
+const geminiApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
+
+function normalizeAiProvider(value) {
+  const provider = String(value ?? "").trim().toLowerCase();
+  if (provider === "gemini" || provider === "anthropic") {
+    return provider;
+  }
+  if (geminiApiKey && !anthropicApiKey) {
+    return "gemini";
+  }
+  return "anthropic";
+}
 
 const config = {
   nodeEnv,
@@ -77,7 +90,11 @@ const config = {
   smtpUser: process.env.SMTP_USER ?? "",
   smtpPass: process.env.SMTP_PASS ?? "",
   smtpFrom: process.env.SMTP_FROM ?? "GymBuddy AI <no-reply@gymbuddy.ai>",
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
+  aiProvider: normalizeAiProvider(process.env.AI_PROVIDER),
+  anthropicApiKey,
+  anthropicModel: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-20250514",
+  geminiApiKey,
+  geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
   googleMapsRegion: process.env.GOOGLE_MAPS_REGION ?? "IN",
 };

@@ -85,6 +85,31 @@ router.get("/messages", auth, async (req, res) => {
   }
 });
 
+router.get("/status", auth, (req, res) => {
+  try {
+    const context = buildUserContext(req.user.id);
+
+    res.json({
+      aiEnabled: anthropicCoach.hasApiKey(),
+      mode: anthropicCoach.getProviderName(),
+      model: anthropicCoach.model,
+      memory: {
+        name: context.userProfile.name,
+        goal: context.userProfile.goal,
+        experience: context.userProfile.experience,
+        city: context.userProfile.city,
+        gym: context.userProfile.locationLabel ?? context.userProfile.gym,
+        streak: context.userStats.streak,
+        workoutsThisMonth: context.userStats.workoutsThisMonth,
+        leaderboardRank: context.userStats.leaderboardRank,
+        nextSuggestedFocus: context.summary?.nextSuggestedFocus,
+      },
+    });
+  } catch {
+    res.status(500).json({ error: "Failed to load coach AI status" });
+  }
+});
+
 router.post("/message", auth, coachMessageLimiter, async (req, res) => {
   const message = String(req.body?.message ?? "").trim();
   if (!message) {
