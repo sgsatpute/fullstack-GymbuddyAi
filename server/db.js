@@ -31,6 +31,74 @@ function createIndexes(indexStatements) {
   }
 }
 
+function createCheckinsTable() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS checkins (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      checkInDate TEXT NOT NULL,
+      xpAwarded INTEGER DEFAULT 10,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES users(id),
+      UNIQUE(userId, checkInDate)
+    )
+  `);
+}
+
+function migrateCheckinsTableIfNeeded() {
+  const table = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'checkins'")
+    .get();
+
+  if (!table) {
+    createCheckinsTable();
+    return;
+  }
+
+  const columns = getColumnNames("checkins");
+  const tableSql = String(table.sql ?? "");
+  const hasLegacyDateColumn = columns.has("date");
+  const hasCheckInDateColumn = columns.has("checkInDate");
+  const hasLegacyGlobalUniqueDate =
+    /date\s+TEXT\s+NOT\s+NULL\s+UNIQUE/i.test(tableSql) ||
+    /UNIQUE\s*\(\s*date\s*\)/i.test(tableSql);
+
+  if (!hasLegacyDateColumn && hasCheckInDateColumn && !hasLegacyGlobalUniqueDate) {
+    ensureColumns("checkins", {
+      xpAwarded: "xpAwarded INTEGER DEFAULT 10",
+    });
+    return;
+  }
+
+  const rows = db.prepare("SELECT * FROM checkins").all();
+  const migrate = db.transaction(() => {
+    db.exec("DROP TABLE checkins");
+    createCheckinsTable();
+
+    const insert = db.prepare(`
+      INSERT OR IGNORE INTO checkins (id, userId, checkInDate, xpAwarded, createdAt)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    for (const row of rows) {
+      const checkInDate = row.checkInDate ?? row.date;
+      if (!row.userId || !checkInDate) {
+        continue;
+      }
+
+      insert.run(
+        row.id ?? null,
+        row.userId,
+        checkInDate,
+        row.xpAwarded ?? 10,
+        row.createdAt ?? new Date().toISOString()
+      );
+    }
+  });
+
+  migrate();
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -112,17 +180,7 @@ db.exec(`
   )
 `);
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS checkins (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    userId INTEGER NOT NULL,
-    checkInDate TEXT NOT NULL,
-    xpAwarded INTEGER DEFAULT 10,
-    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (userId) REFERENCES users(id),
-    UNIQUE(userId, checkInDate)
-  )
-`);
+migrateCheckinsTableIfNeeded();
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS coach_messages (

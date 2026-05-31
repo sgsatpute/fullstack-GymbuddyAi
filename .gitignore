@@ -22,6 +22,7 @@ gymbuddy.db
 
 logs/
 *.log
+server/uploads/
 
 coverage/
 .nyc_output/
