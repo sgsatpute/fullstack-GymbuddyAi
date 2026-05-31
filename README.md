@@ -22,7 +22,7 @@ GymBuddy AI helps gym-goers find compatible workout partners based on goal, expe
 
 | Area | Stack |
 | --- | --- |
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS, TanStack Query, Recharts, framer-motion, Socket.io-client, lucide-react |
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS, TanStack Query, framer-motion, Socket.io-client, lucide-react |
 | Backend | Node.js 20, Express 4, ES modules, JWT, bcryptjs, better-sqlite3, Socket.io, Nodemailer, multer, express-rate-limit |
 | AI and ML | Anthropic Claude, Google Gemini fallback, Python, scikit-learn, pandas, numpy, joblib |
 | DevOps | Docker, Docker Compose, GitHub Actions, Railway, Vercel-ready frontend build, Husky, Pino logging |

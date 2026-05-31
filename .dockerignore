@@ -1,5 +1,8 @@
 node_modules
 **/node_modules
+.local
+attached_assets
+fullstack-GymbuddyAi
 .env
 .env.*
 !.env.example
@@ -15,7 +18,9 @@ build
 coverage
 logs
 *.log
+server/uploads
 __pycache__
+**/__pycache__
 *.pyc
 *.pyo
 *.pkl
