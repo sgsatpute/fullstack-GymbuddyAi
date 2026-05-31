@@ -12,6 +12,13 @@ export default function Login() {
 
   async function handleLogin() {
     setError("");
+
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail || !password) {
+      setError("Enter your email and password to continue.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -19,7 +26,7 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       });
 
       const data = await response.json();
@@ -93,10 +100,10 @@ export default function Login() {
         {error && <div className="feedback error">{error}</div>}
 
         <div className="action-row">
-          <button className="btn btn-primary" onClick={handleLogin} disabled={loading}>
-            {loading ? "Logging In..." : "Login"}
+          <button className="btn btn-primary" type="button" onClick={handleLogin} disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
           </button>
-          <button className="btn btn-secondary" onClick={() => navigate("/forgot-password")}>
+          <button className="btn btn-secondary" type="button" onClick={() => navigate("/forgot-password")}>
             Forgot Password
           </button>
         </div>

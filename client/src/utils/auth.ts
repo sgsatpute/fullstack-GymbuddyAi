@@ -6,6 +6,7 @@ type TokenPayload = {
 };
 
 let refreshPromise: Promise<string | null> | null = null;
+let fallbackToken: string | null = null;
 
 function getStorage() {
   try {
@@ -16,14 +17,16 @@ function getStorage() {
 }
 
 export function getStoredToken() {
-  return getStorage()?.getItem(TOKEN_KEY) ?? null;
+  return getStorage()?.getItem(TOKEN_KEY) ?? fallbackToken;
 }
 
 export function setStoredToken(token: string) {
+  fallbackToken = token;
   getStorage()?.setItem(TOKEN_KEY, token);
 }
 
 export function clearStoredToken() {
+  fallbackToken = null;
   getStorage()?.removeItem(TOKEN_KEY);
 }
 

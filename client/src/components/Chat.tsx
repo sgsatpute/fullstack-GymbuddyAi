@@ -218,7 +218,7 @@ export default function Chat() {
               <span className="eyebrow">Conversation</span>
               <h2>{participant.name}</h2>
               <p className="muted">
-                {formatGoal(participant.goal)} · {formatExperience(participant.experience)} · {formatTimePreference(participant.preferredTime)}
+                {formatGoal(participant.goal)} - {formatExperience(participant.experience)} - {formatTimePreference(participant.preferredTime)}
               </p>
             </div>
           </div>
@@ -236,6 +236,16 @@ export default function Chat() {
         </div>
 
         <div className="chat-stream">
+          {messages.length === 0 && (
+            <div className="subtle-card empty-state">
+              <span className="eyebrow">No messages yet</span>
+              <h3>Start with a simple training plan.</h3>
+              <p className="muted">
+                Suggest a day, time, and workout focus so this match turns into a real session.
+              </p>
+            </div>
+          )}
+
           {messages.map((message, index) => {
             const isMe = message.senderId === myId;
 
@@ -244,7 +254,7 @@ export default function Chat() {
                 <div className={`chat-bubble ${isMe ? "me" : "them"}`}>
                   <div>{message.message}</div>
                   <span className="chat-meta">
-                    {formatDateTime(message.createdAt)} · {isMe ? (message.seen ? "Seen" : "Sent") : participant.name}
+                    {formatDateTime(message.createdAt)} - {isMe ? (message.seen ? "Seen" : "Sent") : participant.name}
                   </span>
                 </div>
               </div>
@@ -265,9 +275,10 @@ export default function Chat() {
               handleTyping();
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Send a message that gets the routine started..."
+            placeholder="Suggest a workout time, focus, or quick plan..."
+            aria-label="Message"
           />
-          <button className="btn btn-primary" onClick={send} disabled={sending}>
+          <button className="btn btn-primary" onClick={send} disabled={sending || !text.trim()}>
             {sending ? "Sending..." : "Send"}
           </button>
         </div>

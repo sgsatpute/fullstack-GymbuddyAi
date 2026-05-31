@@ -68,7 +68,7 @@ export default function Inbox() {
                     <div>
                       <h3>{conversation.user.name}</h3>
                       <p className="muted">
-                        {formatGoal(conversation.user.goal)} · {formatExperience(conversation.user.experience)}
+                        {formatGoal(conversation.user.goal)} - {formatExperience(conversation.user.experience)}
                       </p>
                     </div>
                   </div>
