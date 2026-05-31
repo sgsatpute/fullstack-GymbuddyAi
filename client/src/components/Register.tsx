@@ -15,6 +15,13 @@ export default function Register() {
   async function submit() {
     setError("");
 
+    const normalizedName = name.trim();
+    const normalizedEmail = email.trim();
+    if (!normalizedName || !normalizedEmail || !password || !confirmPassword) {
+      setError("Enter your name, email, and password to create your account.");
+      return;
+    }
+
     if (password.length < 8) {
       setError("Password must be at least 8 characters long.");
       return;
@@ -32,7 +39,7 @@ export default function Register() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name: normalizedName, email: normalizedEmail, password }),
       });
 
       const data = await response.json();
@@ -127,8 +134,8 @@ export default function Register() {
         {error && <div className="feedback error">{error}</div>}
 
         <div className="action-row">
-          <button className="btn btn-primary" onClick={submit} disabled={loading}>
-            {loading ? "Creating Account..." : "Create Account"}
+          <button className="btn btn-primary" type="button" onClick={submit} disabled={loading}>
+            {loading ? "Creating account..." : "Create Account"}
           </button>
         </div>
 

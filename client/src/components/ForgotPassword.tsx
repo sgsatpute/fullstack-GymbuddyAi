@@ -12,6 +12,11 @@ export default function ForgotPassword() {
   const navigate = useNavigate();
 
   async function requestResetCode() {
+    if (!email.trim()) {
+      setError("Enter the email address on your GymBuddy AI account.");
+      return;
+    }
+
     setSubmitting(true);
     setError("");
     setMessage("");
@@ -32,15 +37,25 @@ export default function ForgotPassword() {
       }
 
       setRequested(true);
-      setMessage(data.message || "Check your email for the reset code.");
+      setMessage(data.message || "If that email exists, a reset code has been sent.");
     } catch {
-      setError("Could not send reset code");
+      setError("Could not send the reset code. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
   }
 
   async function confirmReset() {
+    if (!email.trim() || !otp.trim() || !newPassword) {
+      setError("Enter your email, reset code, and new password.");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError("New password must be at least 8 characters long.");
+      return;
+    }
+
     setSubmitting(true);
     setError("");
     setMessage("");
@@ -60,10 +75,10 @@ export default function ForgotPassword() {
         return;
       }
 
-      setMessage("Password updated. Redirecting to login...");
+      setMessage("Password updated. Redirecting you to login...");
       setTimeout(() => navigate("/login"), 1200);
     } catch {
-      setError("Password reset failed");
+      setError("Password reset failed. Check the code and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -71,11 +86,24 @@ export default function ForgotPassword() {
 
   return (
     <div className="auth-page">
+      <div className="auth-brand-panel">
+        <span className="eyebrow">Account recovery</span>
+        <h1>Get back to your training plan without losing momentum.</h1>
+        <p>
+          Use a one-time reset code to secure your account, then continue with your matches, coach, and logs.
+        </p>
+        <div className="auth-proof-grid">
+          <span>Secure OTP</span>
+          <span>Session reset</span>
+          <span>Fast recovery</span>
+          <span>Back to training</span>
+        </div>
+      </div>
       <div className="auth-card">
         <span className="eyebrow">Secure recovery</span>
-        <h1>Reset your password with a one-time code.</h1>
+        <h1>Reset your password safely.</h1>
         <p className="muted">
-          We’ll send a temporary OTP to your email. Use it to set a new password and regain access.
+          Enter your account email. If it exists, we will send a short-lived code you can use to set a new password.
         </p>
 
         <div className="form-grid">
@@ -86,6 +114,7 @@ export default function ForgotPassword() {
               placeholder="you@example.com"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
             />
           </label>
 
@@ -97,6 +126,8 @@ export default function ForgotPassword() {
                   placeholder="6-digit code"
                   value={otp}
                   onChange={(event) => setOtp(event.target.value)}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                 />
               </label>
 
@@ -107,6 +138,7 @@ export default function ForgotPassword() {
                   placeholder="At least 8 characters"
                   value={newPassword}
                   onChange={(event) => setNewPassword(event.target.value)}
+                  autoComplete="new-password"
                 />
               </label>
             </>

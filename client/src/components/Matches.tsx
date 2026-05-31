@@ -102,6 +102,7 @@ export default function Matches() {
   const bestScore = matches.reduce((best, match) => Math.max(best, match.score), 0);
   const nearbyCount = matches.filter((match) => Number(match.distanceKm ?? 99) <= 5).length;
   const chatReadyCount = matches.filter((match) => match.canChat).length;
+  const hasDismissedMatches = dismissedIds.length > 0;
 
   async function generateIntro(userId: number) {
     setIntroLoadingId(userId);
@@ -202,16 +203,36 @@ export default function Matches() {
 
       {matches.length === 0 ? (
         <section className="card empty-state">
-          <h2>No strong matches yet</h2>
-          <p>Update your profile details or come back after more people complete their training setup.</p>
+          <span className="eyebrow">Discover is empty</span>
+          <h2>No new profiles to show yet</h2>
+          <p>
+            GymBuddy only recommends users who completed their training profile. People you already messaged move
+            to Inbox, so Discover can look empty after you connect with someone.
+          </p>
+          <div className="action-row">
+            <button className="btn btn-primary" type="button" onClick={() => navigate("/complete-profile")}>
+              Tune Profile
+            </button>
+            <button className="btn btn-secondary" type="button" onClick={() => navigate("/inbox")}>
+              Open Inbox
+            </button>
+          </div>
         </section>
       ) : !activeMatch ? (
         <section className="card empty-state">
-          <h2>No profiles in this view</h2>
-          <p>Try another filter or reset the deck to review skipped profiles again.</p>
-          <button className="btn btn-primary" type="button" onClick={() => setDismissedIds([])}>
-            Reset Deck
-          </button>
+          <span className="eyebrow">{hasDismissedMatches ? "Deck cleared" : "Filter too narrow"}</span>
+          <h2>No profiles match this view</h2>
+          <p>
+            Try All, reset skipped profiles, or check Inbox for partners you already started chatting with.
+          </p>
+          <div className="action-row">
+            <button className="btn btn-primary" type="button" onClick={() => setDismissedIds([])}>
+              Reset Deck
+            </button>
+            <button className="btn btn-secondary" type="button" onClick={() => navigate("/inbox")}>
+              Open Inbox
+            </button>
+          </div>
         </section>
       ) : (
         <section className="match-deck-grid">
@@ -247,6 +268,7 @@ export default function Matches() {
               <span>Drag right or tap the heart to message.</span>
               <span>Drag left or tap X to skip this profile locally.</span>
               <span>Use AI Intro when you want a natural first message.</span>
+              <span>Already messaged partners live in Inbox, not Discover.</span>
             </div>
             <div className="match-mini-list">
               {filteredMatches.slice(0, 4).map((match) => (

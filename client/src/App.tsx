@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import Chat from "./components/Chat";
@@ -15,10 +16,26 @@ import Nutrition from "./components/Nutrition";
 import Profile from "./components/Profile";
 import Register from "./components/Register";
 import BodyProgress from "./components/BodyProgress";
-import { getCurrentUserId, hasStoredToken } from "./utils/auth";
+import { getCurrentUserId, hasStoredToken, refreshSession } from "./utils/auth";
 
 function Protected({ children }: { children: JSX.Element }) {
-  return hasStoredToken() ? children : <Navigate to="/login" replace />;
+  const [sessionState, setSessionState] = useState<"checking" | "ready" | "guest">(
+    hasStoredToken() ? "ready" : "checking",
+  );
+
+  useEffect(() => {
+    if (sessionState !== "checking") return;
+
+    refreshSession()
+      .then((token) => setSessionState(token ? "ready" : "guest"))
+      .catch(() => setSessionState("guest"));
+  }, [sessionState]);
+
+  if (sessionState === "checking") {
+    return <div className="page-section">Checking your session...</div>;
+  }
+
+  return sessionState === "ready" ? children : <Navigate to="/login" replace />;
 }
 
 function ProtectedShell({ children }: { children: JSX.Element }) {
