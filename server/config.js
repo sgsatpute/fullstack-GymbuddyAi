@@ -17,6 +17,21 @@ function requireEnv(name) {
   return value;
 }
 
+function getJwtSecret(nodeEnv) {
+  if (process.env.JWT_SECRET) {
+    return process.env.JWT_SECRET;
+  }
+
+  if (nodeEnv === "production") {
+    return requireEnv("JWT_SECRET");
+  }
+
+  console.warn(
+    "JWT_SECRET is not set. Using a development-only fallback; set JWT_SECRET in .env before sharing or deploying."
+  );
+  return "gymbuddy_dev_secret_change_me_minimum_32_chars";
+}
+
 function parseCsv(value) {
   return (value ?? "")
     .split(",")
@@ -53,7 +68,7 @@ const config = {
   nodeEnv,
   isProduction: nodeEnv === "production",
   port: parsePositiveInt(process.env.PORT, 5001),
-  jwtSecret: requireEnv("JWT_SECRET"),
+  jwtSecret: getJwtSecret(nodeEnv),
   dbPath: resolveDbPath(process.env.DB_PATH),
   accessTokenTtl: process.env.ACCESS_TOKEN_TTL ?? "15m",
   refreshTokenDays: parsePositiveInt(process.env.REFRESH_TOKEN_DAYS, 7),

@@ -4,7 +4,9 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development node server/index.js",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cross-env NODE_ENV=development node server/index.js",
+    "dev:client": "vite --config client/vite.config.ts --host 0.0.0.0",
     "build": "tsx script/build.ts",
     "start": "node dist/index.cjs",
     "check": "tsc -p client/tsconfig.json --noEmit",
@@ -123,6 +125,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "@vitest/coverage-v8": "^4.1.7",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^10.0.0",
     "cross-env": "^10.1.0",
     "drizzle-kit": "^0.31.8",
     "esbuild": "^0.25.0",
