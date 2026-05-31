@@ -3,6 +3,10 @@ node_modules/
 
 dist/
 build/
+.local/
+attached_assets/
+fullstack-GymbuddyAi/
+.replit
 
 *.db
 *.db-shm
@@ -23,11 +27,13 @@ gymbuddy.db
 logs/
 *.log
 server/uploads/
+metrics.txt
 
 coverage/
 .nyc_output/
 
 __pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
