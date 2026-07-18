@@ -1,6 +1,6 @@
 # GymBuddy AI
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-online-brightgreen)](https://fullstack-gymbuddyai-production.up.railway.app)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-online-brightgreen)](https://fullstack-gymbuddyai.onrender.com)
 [![Railway](https://img.shields.io/badge/Backend-Railway-6f42c1)](https://railway.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-ready-3178c6)](https://www.typescriptlang.org)
 [![Node.js](https://img.shields.io/badge/Node.js-20-339933)](https://nodejs.org)
